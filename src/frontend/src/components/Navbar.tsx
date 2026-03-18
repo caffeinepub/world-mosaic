@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Globe, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
@@ -54,8 +54,11 @@ export function Navbar() {
             to="/"
             className="flex items-center gap-2 font-display font-bold text-xl text-foreground"
           >
-            <Globe className="w-6 h-6 text-primary" />
-            <span className="text-gradient">World Mosaic</span>
+            <img
+              src="/assets/uploads/8CF45E72-C5D1-4FC7-8FF4-F25F3252F920-1.png"
+              alt="World Mosaic"
+              className="h-10 w-auto"
+            />
           </Link>
 
           <nav className="hidden md:flex items-center gap-1">

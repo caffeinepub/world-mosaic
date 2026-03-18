@@ -8,6 +8,7 @@ import {
   createRouter,
 } from "@tanstack/react-router";
 import { Footer } from "./components/Footer";
+import { JoinBanner } from "./components/JoinBanner";
 import { Navbar } from "./components/Navbar";
 import { About } from "./pages/About";
 import { Admin } from "./pages/Admin";
@@ -30,6 +31,7 @@ const rootRoute = createRootRoute({
   component: () => (
     <QueryClientProvider client={queryClient}>
       <div className="min-h-screen flex flex-col">
+        <JoinBanner />
         <Navbar />
         <div className="flex-1">
           <Outlet />
