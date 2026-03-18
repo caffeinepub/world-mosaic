@@ -1,0 +1,107 @@
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Figtree:ital,wght@0,300..900;1,300..900&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0.98 0.012 75;
+    --foreground: 0.18 0.025 30;
+
+    --card: 1 0 0;
+    --card-foreground: 0.18 0.025 30;
+
+    --popover: 1 0 0;
+    --popover-foreground: 0.18 0.025 30;
+
+    --primary: 0.64 0.18 28;
+    --primary-foreground: 1 0 0;
+
+    --secondary: 0.93 0.015 75;
+    --secondary-foreground: 0.18 0.025 30;
+
+    --muted: 0.93 0.015 75;
+    --muted-foreground: 0.5 0.04 40;
+
+    --accent: 0.58 0.13 185;
+    --accent-foreground: 1 0 0;
+
+    --destructive: 0.55 0.22 25;
+    --destructive-foreground: 1 0 0;
+
+    --border: 0.88 0.015 75;
+    --input: 0.88 0.015 75;
+    --ring: 0.64 0.18 28;
+
+    --radius: 0.75rem;
+
+    --chart-1: 0.64 0.18 28;
+    --chart-2: 0.58 0.13 185;
+    --chart-3: 0.72 0.15 85;
+    --chart-4: 0.65 0.16 145;
+    --chart-5: 0.6 0.18 300;
+
+    --sidebar: 0.98 0.012 75;
+    --sidebar-foreground: 0.18 0.025 30;
+    --sidebar-primary: 0.64 0.18 28;
+    --sidebar-primary-foreground: 1 0 0;
+    --sidebar-accent: 0.93 0.015 75;
+    --sidebar-accent-foreground: 0.18 0.025 30;
+    --sidebar-border: 0.88 0.015 75;
+    --sidebar-ring: 0.64 0.18 28;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-display;
+  }
+}
+
+@layer utilities {
+  .gradient-mesh {
+    background: radial-gradient(
+        ellipse at 20% 50%,
+        oklch(0.92 0.08 28 / 0.4) 0%,
+        transparent 60%
+      ),
+      radial-gradient(
+        ellipse at 80% 20%,
+        oklch(0.88 0.06 185 / 0.3) 0%,
+        transparent 50%
+      ),
+      radial-gradient(
+        ellipse at 60% 80%,
+        oklch(0.9 0.07 85 / 0.3) 0%,
+        transparent 55%
+      ), oklch(0.98 0.012 75);
+  }
+
+  .card-hover {
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-card;
+  }
+
+  .text-gradient {
+    background: linear-gradient(
+      135deg,
+      oklch(0.64 0.18 28),
+      oklch(0.58 0.13 185)
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
