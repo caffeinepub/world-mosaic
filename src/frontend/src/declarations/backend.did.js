@@ -24,7 +24,74 @@ export const UserRole = IDL.Variant({
   'user' : IDL.Null,
   'guest' : IDL.Null,
 });
-export const UserProfile = IDL.Record({ 'name' : IDL.Text });
+export const Badge = IDL.Record({
+  'id' : IDL.Nat,
+  'badgeType' : IDL.Text,
+  'userId' : IDL.Nat,
+  'color' : IDL.Text,
+  'awardedAt' : IDL.Int,
+  'awardedBy' : IDL.Text,
+  'reason' : IDL.Text,
+});
+export const SocialUser = IDL.Record({
+  'id' : IDL.Nat,
+  'bio' : IDL.Text,
+  'portfolioLink' : IDL.Opt(IDL.Text),
+  'userType' : IDL.Text,
+  'activityScore' : IDL.Int,
+  'country' : IDL.Text,
+  'username' : IDL.Text,
+  'displayName' : IDL.Text,
+  'createdAt' : IDL.Int,
+  'email' : IDL.Text,
+  'avatarUrl' : IDL.Text,
+  'passwordHash' : IDL.Text,
+  'stageName' : IDL.Opt(IDL.Text),
+});
+export const UserProfile = IDL.Record({ 'socialUserId' : IDL.Opt(IDL.Nat) });
+export const DailyAnswer = IDL.Record({
+  'id' : IDL.Nat,
+  'username' : IDL.Text,
+  'userId' : IDL.Nat,
+  'createdAt' : IDL.Int,
+  'answer' : IDL.Text,
+  'questionId' : IDL.Nat,
+});
+export const FriendRequest = IDL.Record({
+  'id' : IDL.Nat,
+  'status' : IDL.Variant({
+    'pending' : IDL.Null,
+    'rejected' : IDL.Null,
+    'accepted' : IDL.Null,
+  }),
+  'createdAt' : IDL.Int,
+  'toUserId' : IDL.Nat,
+  'fromUserId' : IDL.Nat,
+});
+export const Notification = IDL.Record({
+  'id' : IDL.Nat,
+  'notifType' : IDL.Text,
+  'userId' : IDL.Nat,
+  'createdAt' : IDL.Int,
+  'isRead' : IDL.Bool,
+  'message' : IDL.Text,
+  'relatedId' : IDL.Opt(IDL.Nat),
+});
+export const PostComment = IDL.Record({
+  'id' : IDL.Nat,
+  'authorId' : IDL.Nat,
+  'createdAt' : IDL.Int,
+  'text' : IDL.Text,
+  'authorName' : IDL.Text,
+  'postId' : IDL.Nat,
+});
+export const Post = IDL.Record({
+  'id' : IDL.Nat,
+  'authorId' : IDL.Nat,
+  'createdAt' : IDL.Int,
+  'imageUrl' : IDL.Text,
+  'caption' : IDL.Text,
+});
 export const Profile = IDL.Record({
   'id' : IDL.Nat,
   'bio' : IDL.Text,
@@ -42,6 +109,13 @@ export const Review = IDL.Record({
   'profileId' : IDL.Nat,
   'comment' : IDL.Text,
   'rating' : IDL.Nat,
+});
+export const DailyQuestion = IDL.Record({
+  'id' : IDL.Nat,
+  'postedBy' : IDL.Text,
+  'question' : IDL.Text,
+  'date' : IDL.Text,
+  'createdAt' : IDL.Int,
 });
 
 export const idlService = IDL.Service({
@@ -72,8 +146,26 @@ export const idlService = IDL.Service({
     ),
   '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+  'acceptFriendRequest' : IDL.Func([IDL.Nat], [], []),
+  'addPostComment' : IDL.Func(
+      [IDL.Nat, IDL.Nat, IDL.Text, IDL.Text],
+      [IDL.Nat],
+      [],
+    ),
   'addReview' : IDL.Func([IDL.Nat, IDL.Text, IDL.Nat, IDL.Text], [IDL.Nat], []),
+  'areFriends' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Bool], ['query']),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'awardBadge' : IDL.Func(
+      [IDL.Nat, IDL.Text, IDL.Text, IDL.Text, IDL.Text],
+      [IDL.Nat],
+      [],
+    ),
+  'createNotification' : IDL.Func(
+      [IDL.Nat, IDL.Text, IDL.Text, IDL.Opt(IDL.Nat)],
+      [IDL.Nat],
+      [],
+    ),
+  'createPost' : IDL.Func([IDL.Nat, IDL.Text, IDL.Text], [IDL.Nat], []),
   'createProfile' : IDL.Func(
       [
         IDL.Text,
@@ -86,7 +178,11 @@ export const idlService = IDL.Service({
       [IDL.Nat],
       [],
     ),
+  'deletePost' : IDL.Func([IDL.Nat], [], []),
+  'deletePostComment' : IDL.Func([IDL.Nat], [], []),
   'deleteProfile' : IDL.Func([IDL.Nat], [], []),
+  'getAllBadges' : IDL.Func([], [IDL.Vec(Badge)], ['query']),
+  'getAllSocialUsers' : IDL.Func([], [IDL.Vec(SocialUser)], ['query']),
   'getAverageRating' : IDL.Func([IDL.Nat], [IDL.Opt(IDL.Float64)], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
@@ -95,23 +191,86 @@ export const idlService = IDL.Service({
       [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
       ['query'],
     ),
+  'getDailyAnswers' : IDL.Func([IDL.Nat], [IDL.Vec(DailyAnswer)], ['query']),
+  'getFriendRequestsReceived' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Vec(FriendRequest)],
+      ['query'],
+    ),
+  'getFriendRequestsSent' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Vec(FriendRequest)],
+      ['query'],
+    ),
+  'getFriends' : IDL.Func([IDL.Nat], [IDL.Vec(IDL.Nat)], ['query']),
+  'getLeaderboard' : IDL.Func([], [IDL.Vec(SocialUser)], ['query']),
   'getLikeCount' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
+  'getNotifications' : IDL.Func([IDL.Nat], [IDL.Vec(Notification)], ['query']),
+  'getPostComments' : IDL.Func([IDL.Nat], [IDL.Vec(PostComment)], ['query']),
+  'getPostLikeCount' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
+  'getPosts' : IDL.Func([], [IDL.Vec(Post)], ['query']),
+  'getPostsByUser' : IDL.Func([IDL.Nat], [IDL.Vec(Post)], ['query']),
   'getProfile' : IDL.Func([IDL.Nat], [Profile], ['query']),
   'getProfiles' : IDL.Func([], [IDL.Vec(Profile)], ['query']),
   'getProfilesByCountry' : IDL.Func([IDL.Text], [IDL.Vec(Profile)], ['query']),
   'getReviews' : IDL.Func([IDL.Nat], [IDL.Vec(Review)], ['query']),
+  'getSocialUser' : IDL.Func([IDL.Nat], [SocialUser], ['query']),
+  'getTodayQuestion' : IDL.Func(
+      [IDL.Text],
+      [IDL.Opt(DailyQuestion)],
+      ['query'],
+    ),
+  'getUnreadCount' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
+  'getUserBadges' : IDL.Func([IDL.Nat], [IDL.Vec(Badge)], ['query']),
   'getUserProfile' : IDL.Func(
       [IDL.Principal],
       [IDL.Opt(UserProfile)],
       ['query'],
     ),
+  'hasSocialUserAnswered' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Bool], ['query']),
+  'hasUserLikedPost' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Bool], ['query']),
+  'incrementUserActivity' : IDL.Func([IDL.Nat, IDL.Int], [], []),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+  'likePost' : IDL.Func([IDL.Nat, IDL.Nat], [], []),
   'likeProfile' : IDL.Func([IDL.Nat], [], []),
+  'loginUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Opt(IDL.Nat)], ['query']),
+  'markAllNotificationsRead' : IDL.Func([IDL.Nat], [], []),
+  'markNotificationRead' : IDL.Func([IDL.Nat], [], []),
+  'postDailyQuestion' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
+  'registerUser' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text],
+      [IDL.Nat],
+      [],
+    ),
+  'rejectFriendRequest' : IDL.Func([IDL.Nat], [], []),
+  'removeBadge' : IDL.Func([IDL.Nat], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'searchProfiles' : IDL.Func([IDL.Text], [IDL.Vec(Profile)], ['query']),
+  'sendFriendRequest' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Nat], []),
+  'submitDailyAnswer' : IDL.Func(
+      [IDL.Nat, IDL.Nat, IDL.Text, IDL.Text],
+      [IDL.Nat],
+      [],
+    ),
+  'unlikePost' : IDL.Func([IDL.Nat, IDL.Nat], [], []),
   'updateProfile' : IDL.Func(
       [
         IDL.Nat,
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+        IDL.Opt(IDL.Text),
+        IDL.Opt(IDL.Text),
+      ],
+      [],
+      [],
+    ),
+  'updateSocialUser' : IDL.Func(
+      [
+        IDL.Nat,
+        IDL.Text,
+        IDL.Text,
         IDL.Text,
         IDL.Text,
         IDL.Text,
@@ -143,7 +302,74 @@ export const idlFactory = ({ IDL }) => {
     'user' : IDL.Null,
     'guest' : IDL.Null,
   });
-  const UserProfile = IDL.Record({ 'name' : IDL.Text });
+  const Badge = IDL.Record({
+    'id' : IDL.Nat,
+    'badgeType' : IDL.Text,
+    'userId' : IDL.Nat,
+    'color' : IDL.Text,
+    'awardedAt' : IDL.Int,
+    'awardedBy' : IDL.Text,
+    'reason' : IDL.Text,
+  });
+  const SocialUser = IDL.Record({
+    'id' : IDL.Nat,
+    'bio' : IDL.Text,
+    'portfolioLink' : IDL.Opt(IDL.Text),
+    'userType' : IDL.Text,
+    'activityScore' : IDL.Int,
+    'country' : IDL.Text,
+    'username' : IDL.Text,
+    'displayName' : IDL.Text,
+    'createdAt' : IDL.Int,
+    'email' : IDL.Text,
+    'avatarUrl' : IDL.Text,
+    'passwordHash' : IDL.Text,
+    'stageName' : IDL.Opt(IDL.Text),
+  });
+  const UserProfile = IDL.Record({ 'socialUserId' : IDL.Opt(IDL.Nat) });
+  const DailyAnswer = IDL.Record({
+    'id' : IDL.Nat,
+    'username' : IDL.Text,
+    'userId' : IDL.Nat,
+    'createdAt' : IDL.Int,
+    'answer' : IDL.Text,
+    'questionId' : IDL.Nat,
+  });
+  const FriendRequest = IDL.Record({
+    'id' : IDL.Nat,
+    'status' : IDL.Variant({
+      'pending' : IDL.Null,
+      'rejected' : IDL.Null,
+      'accepted' : IDL.Null,
+    }),
+    'createdAt' : IDL.Int,
+    'toUserId' : IDL.Nat,
+    'fromUserId' : IDL.Nat,
+  });
+  const Notification = IDL.Record({
+    'id' : IDL.Nat,
+    'notifType' : IDL.Text,
+    'userId' : IDL.Nat,
+    'createdAt' : IDL.Int,
+    'isRead' : IDL.Bool,
+    'message' : IDL.Text,
+    'relatedId' : IDL.Opt(IDL.Nat),
+  });
+  const PostComment = IDL.Record({
+    'id' : IDL.Nat,
+    'authorId' : IDL.Nat,
+    'createdAt' : IDL.Int,
+    'text' : IDL.Text,
+    'authorName' : IDL.Text,
+    'postId' : IDL.Nat,
+  });
+  const Post = IDL.Record({
+    'id' : IDL.Nat,
+    'authorId' : IDL.Nat,
+    'createdAt' : IDL.Int,
+    'imageUrl' : IDL.Text,
+    'caption' : IDL.Text,
+  });
   const Profile = IDL.Record({
     'id' : IDL.Nat,
     'bio' : IDL.Text,
@@ -161,6 +387,13 @@ export const idlFactory = ({ IDL }) => {
     'profileId' : IDL.Nat,
     'comment' : IDL.Text,
     'rating' : IDL.Nat,
+  });
+  const DailyQuestion = IDL.Record({
+    'id' : IDL.Nat,
+    'postedBy' : IDL.Text,
+    'question' : IDL.Text,
+    'date' : IDL.Text,
+    'createdAt' : IDL.Int,
   });
   
   return IDL.Service({
@@ -191,12 +424,30 @@ export const idlFactory = ({ IDL }) => {
       ),
     '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+    'acceptFriendRequest' : IDL.Func([IDL.Nat], [], []),
+    'addPostComment' : IDL.Func(
+        [IDL.Nat, IDL.Nat, IDL.Text, IDL.Text],
+        [IDL.Nat],
+        [],
+      ),
     'addReview' : IDL.Func(
         [IDL.Nat, IDL.Text, IDL.Nat, IDL.Text],
         [IDL.Nat],
         [],
       ),
+    'areFriends' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Bool], ['query']),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'awardBadge' : IDL.Func(
+        [IDL.Nat, IDL.Text, IDL.Text, IDL.Text, IDL.Text],
+        [IDL.Nat],
+        [],
+      ),
+    'createNotification' : IDL.Func(
+        [IDL.Nat, IDL.Text, IDL.Text, IDL.Opt(IDL.Nat)],
+        [IDL.Nat],
+        [],
+      ),
+    'createPost' : IDL.Func([IDL.Nat, IDL.Text, IDL.Text], [IDL.Nat], []),
     'createProfile' : IDL.Func(
         [
           IDL.Text,
@@ -209,7 +460,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Nat],
         [],
       ),
+    'deletePost' : IDL.Func([IDL.Nat], [], []),
+    'deletePostComment' : IDL.Func([IDL.Nat], [], []),
     'deleteProfile' : IDL.Func([IDL.Nat], [], []),
+    'getAllBadges' : IDL.Func([], [IDL.Vec(Badge)], ['query']),
+    'getAllSocialUsers' : IDL.Func([], [IDL.Vec(SocialUser)], ['query']),
     'getAverageRating' : IDL.Func([IDL.Nat], [IDL.Opt(IDL.Float64)], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
@@ -218,7 +473,29 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
         ['query'],
       ),
+    'getDailyAnswers' : IDL.Func([IDL.Nat], [IDL.Vec(DailyAnswer)], ['query']),
+    'getFriendRequestsReceived' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Vec(FriendRequest)],
+        ['query'],
+      ),
+    'getFriendRequestsSent' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Vec(FriendRequest)],
+        ['query'],
+      ),
+    'getFriends' : IDL.Func([IDL.Nat], [IDL.Vec(IDL.Nat)], ['query']),
+    'getLeaderboard' : IDL.Func([], [IDL.Vec(SocialUser)], ['query']),
     'getLikeCount' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
+    'getNotifications' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Vec(Notification)],
+        ['query'],
+      ),
+    'getPostComments' : IDL.Func([IDL.Nat], [IDL.Vec(PostComment)], ['query']),
+    'getPostLikeCount' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
+    'getPosts' : IDL.Func([], [IDL.Vec(Post)], ['query']),
+    'getPostsByUser' : IDL.Func([IDL.Nat], [IDL.Vec(Post)], ['query']),
     'getProfile' : IDL.Func([IDL.Nat], [Profile], ['query']),
     'getProfiles' : IDL.Func([], [IDL.Vec(Profile)], ['query']),
     'getProfilesByCountry' : IDL.Func(
@@ -227,18 +504,71 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getReviews' : IDL.Func([IDL.Nat], [IDL.Vec(Review)], ['query']),
+    'getSocialUser' : IDL.Func([IDL.Nat], [SocialUser], ['query']),
+    'getTodayQuestion' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(DailyQuestion)],
+        ['query'],
+      ),
+    'getUnreadCount' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
+    'getUserBadges' : IDL.Func([IDL.Nat], [IDL.Vec(Badge)], ['query']),
     'getUserProfile' : IDL.Func(
         [IDL.Principal],
         [IDL.Opt(UserProfile)],
         ['query'],
       ),
+    'hasSocialUserAnswered' : IDL.Func(
+        [IDL.Nat, IDL.Nat],
+        [IDL.Bool],
+        ['query'],
+      ),
+    'hasUserLikedPost' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Bool], ['query']),
+    'incrementUserActivity' : IDL.Func([IDL.Nat, IDL.Int], [], []),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+    'likePost' : IDL.Func([IDL.Nat, IDL.Nat], [], []),
     'likeProfile' : IDL.Func([IDL.Nat], [], []),
+    'loginUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Opt(IDL.Nat)], ['query']),
+    'markAllNotificationsRead' : IDL.Func([IDL.Nat], [], []),
+    'markNotificationRead' : IDL.Func([IDL.Nat], [], []),
+    'postDailyQuestion' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text],
+        [IDL.Nat],
+        [],
+      ),
+    'registerUser' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text],
+        [IDL.Nat],
+        [],
+      ),
+    'rejectFriendRequest' : IDL.Func([IDL.Nat], [], []),
+    'removeBadge' : IDL.Func([IDL.Nat], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'searchProfiles' : IDL.Func([IDL.Text], [IDL.Vec(Profile)], ['query']),
+    'sendFriendRequest' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Nat], []),
+    'submitDailyAnswer' : IDL.Func(
+        [IDL.Nat, IDL.Nat, IDL.Text, IDL.Text],
+        [IDL.Nat],
+        [],
+      ),
+    'unlikePost' : IDL.Func([IDL.Nat, IDL.Nat], [], []),
     'updateProfile' : IDL.Func(
         [
           IDL.Nat,
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          IDL.Opt(IDL.Text),
+          IDL.Opt(IDL.Text),
+        ],
+        [],
+        [],
+      ),
+    'updateSocialUser' : IDL.Func(
+        [
+          IDL.Nat,
+          IDL.Text,
+          IDL.Text,
           IDL.Text,
           IDL.Text,
           IDL.Text,

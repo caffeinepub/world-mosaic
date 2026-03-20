@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
+  Badge,
+  DailyAnswer,
+  DailyQuestion,
+  FriendRequest,
   backendInterface as FullBackend,
+  Notification,
   Post,
   PostComment,
   Profile,
@@ -240,6 +245,32 @@ export function useSocialUser(userId: bigint | null) {
   });
 }
 
+export function useAllSocialUsers() {
+  const { actor: rawActor, isFetching } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  return useQuery<SocialUser[]>({
+    queryKey: ["allSocialUsers"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getAllSocialUsers();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useLeaderboard() {
+  const { actor: rawActor, isFetching } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  return useQuery<SocialUser[]>({
+    queryKey: ["leaderboard"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getLeaderboard();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
 // ── Post hooks ──────────────────────────────────────────────────────────────
 
 export function usePosts() {
@@ -388,6 +419,387 @@ export function useAddPostComment() {
     onSuccess: (_, { postId }) => {
       queryClient.invalidateQueries({
         queryKey: ["postComments", postId.toString()],
+      });
+    },
+  });
+}
+
+// ── Notifications ───────────────────────────────────────────────────────────
+
+export function useNotificationsList(userId: bigint | null) {
+  const { actor: rawActor, isFetching } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  return useQuery<Notification[]>({
+    queryKey: ["notifications", userId?.toString()],
+    queryFn: async () => {
+      if (!actor || !userId) return [];
+      const list = await actor.getNotifications(userId);
+      return [...list].sort((a, b) => Number(b.createdAt - a.createdAt));
+    },
+    enabled: !!actor && !isFetching && !!userId,
+  });
+}
+
+export function useUnreadNotificationCount(userId: bigint | null) {
+  const { actor: rawActor, isFetching } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  return useQuery<bigint>({
+    queryKey: ["unreadCount", userId?.toString()],
+    queryFn: async () => {
+      if (!actor || !userId) return BigInt(0);
+      return actor.getUnreadCount(userId);
+    },
+    enabled: !!actor && !isFetching && !!userId,
+  });
+}
+
+export function useMarkNotificationRead() {
+  const { actor: rawActor } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (notifId: bigint) => {
+      if (!actor) throw new Error("No actor");
+      return actor.markNotificationRead(notifId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+    },
+  });
+}
+
+export function useMarkAllNotificationsRead() {
+  const { actor: rawActor } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (userId: bigint) => {
+      if (!actor) throw new Error("No actor");
+      return actor.markAllNotificationsRead(userId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+    },
+  });
+}
+
+// ── Friend Requests ─────────────────────────────────────────────────────────
+
+export function useFriends(userId: bigint | null) {
+  const { actor: rawActor, isFetching } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  return useQuery<bigint[]>({
+    queryKey: ["friends", userId?.toString()],
+    queryFn: async () => {
+      if (!actor || !userId) return [];
+      return actor.getFriends(userId);
+    },
+    enabled: !!actor && !isFetching && !!userId,
+  });
+}
+
+export function useFriendRequestsReceived(userId: bigint | null) {
+  const { actor: rawActor, isFetching } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  return useQuery<FriendRequest[]>({
+    queryKey: ["friendRequestsReceived", userId?.toString()],
+    queryFn: async () => {
+      if (!actor || !userId) return [];
+      return actor.getFriendRequestsReceived(userId);
+    },
+    enabled: !!actor && !isFetching && !!userId,
+  });
+}
+
+export function useFriendRequestsSent(userId: bigint | null) {
+  const { actor: rawActor, isFetching } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  return useQuery<FriendRequest[]>({
+    queryKey: ["friendRequestsSent", userId?.toString()],
+    queryFn: async () => {
+      if (!actor || !userId) return [];
+      return actor.getFriendRequestsSent(userId);
+    },
+    enabled: !!actor && !isFetching && !!userId,
+  });
+}
+
+export function useAreFriends(userId1: bigint | null, userId2: bigint | null) {
+  const { actor: rawActor, isFetching } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  return useQuery<boolean>({
+    queryKey: ["areFriends", userId1?.toString(), userId2?.toString()],
+    queryFn: async () => {
+      if (!actor || !userId1 || !userId2) return false;
+      return actor.areFriends(userId1, userId2);
+    },
+    enabled: !!actor && !isFetching && !!userId1 && !!userId2,
+  });
+}
+
+export function useSendFriendRequest() {
+  const { actor: rawActor } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { fromId: bigint; toId: bigint }) => {
+      if (!actor) throw new Error("No actor");
+      return actor.sendFriendRequest(data.fromId, data.toId);
+    },
+    onSuccess: (_, { fromId }) => {
+      queryClient.invalidateQueries({
+        queryKey: ["friendRequestsSent", fromId.toString()],
+      });
+    },
+  });
+}
+
+export function useAcceptFriendRequest() {
+  const { actor: rawActor } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (requestId: bigint) => {
+      if (!actor) throw new Error("No actor");
+      return actor.acceptFriendRequest(requestId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["friendRequestsReceived"] });
+      queryClient.invalidateQueries({ queryKey: ["friends"] });
+      queryClient.invalidateQueries({ queryKey: ["areFriends"] });
+    },
+  });
+}
+
+export function useRejectFriendRequest() {
+  const { actor: rawActor } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (requestId: bigint) => {
+      if (!actor) throw new Error("No actor");
+      return actor.rejectFriendRequest(requestId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["friendRequestsReceived"] });
+    },
+  });
+}
+
+// ── Badges ───────────────────────────────────────────────────────────────────
+
+export function useUserBadges(userId: bigint | null) {
+  const { actor: rawActor, isFetching } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  return useQuery<Badge[]>({
+    queryKey: ["userBadges", userId?.toString()],
+    queryFn: async () => {
+      if (!actor || !userId) return [];
+      return actor.getUserBadges(userId);
+    },
+    enabled: !!actor && !isFetching && !!userId,
+  });
+}
+
+export function useAllBadges() {
+  const { actor: rawActor, isFetching } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  return useQuery<Badge[]>({
+    queryKey: ["allBadges"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getAllBadges();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useAwardBadge() {
+  const { actor: rawActor } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      userId: bigint;
+      badgeType: string;
+      color: string;
+      awardedBy: string;
+      reason: string;
+    }) => {
+      if (!actor) throw new Error("No actor");
+      return actor.awardBadge(
+        data.userId,
+        data.badgeType,
+        data.color,
+        data.awardedBy,
+        data.reason,
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["userBadges"] });
+      queryClient.invalidateQueries({ queryKey: ["allBadges"] });
+    },
+  });
+}
+
+export function useRemoveBadge() {
+  const { actor: rawActor } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (badgeId: bigint) => {
+      if (!actor) throw new Error("No actor");
+      return actor.removeBadge(badgeId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["userBadges"] });
+      queryClient.invalidateQueries({ queryKey: ["allBadges"] });
+    },
+  });
+}
+
+// ── Daily Question ───────────────────────────────────────────────────────────
+
+export function useTodayQuestion(date: string) {
+  const { actor: rawActor, isFetching } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  return useQuery<DailyQuestion | null>({
+    queryKey: ["todayQuestion", date],
+    queryFn: async () => {
+      if (!actor) return null;
+      return actor.getTodayQuestion(date);
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useDailyAnswers(questionId: bigint | null) {
+  const { actor: rawActor, isFetching } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  return useQuery<DailyAnswer[]>({
+    queryKey: ["dailyAnswers", questionId?.toString()],
+    queryFn: async () => {
+      if (!actor || !questionId) return [];
+      return actor.getDailyAnswers(questionId);
+    },
+    enabled: !!actor && !isFetching && !!questionId,
+  });
+}
+
+export function useHasAnswered(
+  questionId: bigint | null,
+  userId: bigint | null,
+) {
+  const { actor: rawActor, isFetching } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  return useQuery<boolean>({
+    queryKey: ["hasAnswered", questionId?.toString(), userId?.toString()],
+    queryFn: async () => {
+      if (!actor || !questionId || !userId) return false;
+      return actor.hasSocialUserAnswered(questionId, userId);
+    },
+    enabled: !!actor && !isFetching && !!questionId && !!userId,
+  });
+}
+
+export function useSubmitDailyAnswer() {
+  const { actor: rawActor } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      questionId: bigint;
+      userId: bigint;
+      username: string;
+      answer: string;
+    }) => {
+      if (!actor) throw new Error("No actor");
+      return actor.submitDailyAnswer(
+        data.questionId,
+        data.userId,
+        data.username,
+        data.answer,
+      );
+    },
+    onSuccess: (_, { questionId, userId }) => {
+      queryClient.invalidateQueries({
+        queryKey: ["dailyAnswers", questionId.toString()],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["hasAnswered", questionId.toString(), userId.toString()],
+      });
+    },
+  });
+}
+
+export function usePostDailyQuestion() {
+  const { actor: rawActor } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      question: string;
+      date: string;
+      postedBy: string;
+    }) => {
+      if (!actor) throw new Error("No actor");
+      return actor.postDailyQuestion(data.question, data.date, data.postedBy);
+    },
+    onSuccess: (_, { date }) => {
+      queryClient.invalidateQueries({ queryKey: ["todayQuestion", date] });
+    },
+  });
+}
+
+export function useIncrementUserActivity() {
+  const { actor: rawActor } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { userId: bigint; points: bigint }) => {
+      if (!actor) throw new Error("No actor");
+      return actor.incrementUserActivity(data.userId, data.points);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
+    },
+  });
+}
+
+export function useUpdateSocialUser() {
+  const { actor: rawActor } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      userId: bigint;
+      displayName: string;
+      email: string;
+      country: string;
+      bio: string;
+      avatarUrl: string;
+      userType: string;
+      stageName: string | null;
+      portfolioLink: string | null;
+    }) => {
+      if (!actor) throw new Error("No actor");
+      return actor.updateSocialUser(
+        data.userId,
+        data.displayName,
+        data.email,
+        data.country,
+        data.bio,
+        data.avatarUrl,
+        data.userType,
+        data.stageName,
+        data.portfolioLink,
+      );
+    },
+    onSuccess: (_, { userId }) => {
+      queryClient.invalidateQueries({
+        queryKey: ["socialUser", userId.toString()],
       });
     },
   });

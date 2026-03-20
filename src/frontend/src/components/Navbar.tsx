@@ -7,16 +7,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Bell, LogOut, Menu, User, X } from "lucide-react";
+import { LogOut, Menu, User, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
-import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
 import { AuthModal } from "./AuthModal";
+import { NotificationBell } from "./NotificationBell";
 
 const navLinks = [
   { to: "/" as const, label: "Home", ocid: "nav.home.link" },
   { to: "/feed" as const, label: "Feed", ocid: "nav.feed.link" },
+  { to: "/explore" as const, label: "Explore", ocid: "nav.explore.link" },
+  {
+    to: "/leaderboard" as const,
+    label: "Rankings",
+    ocid: "nav.leaderboard.link",
+  },
   {
     to: "/browse" as const,
     label: "Browse",
@@ -47,25 +53,6 @@ export function Navbar() {
     setAuthModalOpen(true);
   };
 
-  const handleBellClick = () => {
-    if (typeof Notification !== "undefined") {
-      if (Notification.permission === "granted") {
-        toast.success("Notifications are enabled!");
-      } else if (Notification.permission === "denied") {
-        toast.error(
-          "Notifications are blocked. Enable them in browser settings.",
-        );
-      } else {
-        Notification.requestPermission().then((p) => {
-          if (p === "granted") toast.success("Notifications enabled!");
-          else toast("Notification permission dismissed.");
-        });
-      }
-    } else {
-      toast("Notifications not supported in this browser.");
-    }
-  };
-
   return (
     <>
       <header className="sticky top-0 z-50 bg-card/80 backdrop-blur-md border-b border-border">
@@ -83,14 +70,14 @@ export function Navbar() {
             </Link>
 
             {/* Desktop nav */}
-            <nav className="hidden md:flex items-center gap-1">
+            <nav className="hidden md:flex items-center gap-0.5 overflow-x-auto">
               {navLinks.map((link) => (
                 <Link
                   key={link.to}
                   to={link.to}
                   search={"search" in link ? link.search : undefined}
                   data-ocid={link.ocid}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
                     currentPath === link.to
                       ? "bg-primary/10 text-primary"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -105,16 +92,7 @@ export function Navbar() {
             <div className="flex items-center gap-2">
               {user ? (
                 <>
-                  {/* Bell icon */}
-                  <button
-                    type="button"
-                    data-ocid="nav.notifications.button"
-                    onClick={handleBellClick}
-                    className="hidden md:flex p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                    aria-label="Notifications"
-                  >
-                    <Bell className="w-5 h-5" />
-                  </button>
+                  <NotificationBell />
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -129,7 +107,7 @@ export function Navbar() {
                             {user.displayName?.[0]?.toUpperCase() ?? "U"}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="text-sm font-medium text-foreground">
+                        <span className="text-sm font-medium text-foreground hidden lg:block">
                           {user.username}
                         </span>
                       </button>

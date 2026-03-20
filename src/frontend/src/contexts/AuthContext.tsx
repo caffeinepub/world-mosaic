@@ -1,6 +1,7 @@
 import {
   type ReactNode,
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useState,
@@ -22,9 +23,13 @@ interface SignupData {
   username: string;
   password: string;
   displayName: string;
+  email: string;
   country: string;
   bio: string;
   avatarUrl: string;
+  userType: string;
+  stageName: string;
+  portfolioLink: string;
 }
 
 interface AuthContextType {
@@ -34,6 +39,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<void>;
   signup: (data: SignupData) => Promise<void>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -70,6 +76,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
   }, [actor, isFetching, userId]);
 
+  const refreshUser = useCallback(async () => {
+    if (!actor || !userId) return;
+    try {
+      const u = await actor.getSocialUser(userId);
+      setUser(u);
+    } catch {
+      // silently ignore refresh errors
+    }
+  }, [actor, userId]);
+
   const login = async (username: string, password: string) => {
     if (!actor) throw new Error("Not connected");
     const hash = await hashPassword(password);
@@ -89,9 +105,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data.username,
       hash,
       data.displayName,
+      data.email,
       data.country,
       data.bio,
       data.avatarUrl,
+    );
+    // Update extended fields (userType, stageName, portfolioLink)
+    await actor.updateSocialUser(
+      id,
+      data.displayName,
+      data.email,
+      data.country,
+      data.bio,
+      data.avatarUrl,
+      data.userType || "member",
+      data.stageName || null,
+      data.portfolioLink || null,
     );
     const u = await actor.getSocialUser(id);
     localStorage.setItem(USER_ID_KEY, id.toString());
@@ -108,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ userId, user, isLoading, login, signup, logout }}
+      value={{ userId, user, isLoading, login, signup, logout, refreshUser }}
     >
       {children}
     </AuthContext.Provider>

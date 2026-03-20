@@ -7,11 +7,14 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ImagePlus, Loader2 } from "lucide-react";
+import { CheckCircle2, ImagePlus, Loader2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useCreatePost } from "../hooks/useQueries";
 import { uploadFileToStorage } from "../utils/uploadFile";
+
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 interface CreatePostModalProps {
   open: boolean;
@@ -28,21 +31,40 @@ export function CreatePostModal({
   const [imagePreview, setImagePreview] = useState("");
   const [caption, setCaption] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const createPost = useCreatePost();
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Validate file type
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      toast.error("Only JPEG, PNG, and WebP images are allowed.");
+      e.target.value = "";
+      return;
+    }
+
+    // Validate file size
+    if (file.size > MAX_SIZE_BYTES) {
+      toast.error("Image must be under 10 MB.");
+      e.target.value = "";
+      return;
+    }
+
     const preview = URL.createObjectURL(file);
     setImagePreview(preview);
     setUploading(true);
+    setUploadProgress(0);
     try {
-      const url = await uploadFileToStorage(file);
+      const url = await uploadFileToStorage(file, (p) => setUploadProgress(p));
       setImageUrl(url);
+      setUploadProgress(100);
     } catch {
       toast.error("Failed to upload image. Please try again.");
       setImagePreview("");
+      setUploadProgress(0);
     } finally {
       setUploading(false);
     }
@@ -52,6 +74,7 @@ export function CreatePostModal({
     setImageUrl("");
     setImagePreview("");
     setCaption("");
+    setUploadProgress(0);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -105,18 +128,33 @@ export function CreatePostModal({
                 <p className="text-sm text-muted-foreground">
                   Click to upload photo
                 </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  JPEG, PNG, WebP · max 10 MB
+                </p>
               </div>
             )}
             {uploading && (
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2">
                 <Loader2 className="w-8 h-8 text-white animate-spin" />
+                <p className="text-white text-sm font-medium">
+                  Uploading... {uploadProgress}%
+                </p>
               </div>
             )}
           </button>
+
+          {/* Upload status indicator */}
+          {!uploading && imageUrl && (
+            <p className="flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400">
+              <CheckCircle2 className="w-4 h-4" />
+              Ready to post!
+            </p>
+          )}
+
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp"
             className="hidden"
             onChange={handleImageUpload}
             data-ocid="create_post.upload_button"

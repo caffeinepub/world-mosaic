@@ -1,6 +1,8 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { Link } from "@tanstack/react-router";
 import { Heart, MessageCircle, Plus } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -8,16 +10,21 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { Post } from "../backend.d";
 import { CreatePostModal } from "../components/CreatePostModal";
+import { DynamicBackground } from "../components/DynamicBackground";
 import { useAuth } from "../contexts/AuthContext";
 import { sendNotification, useNotifications } from "../hooks/useNotifications";
 import {
   useAddPostComment,
+  useDailyAnswers,
+  useHasAnswered,
   useHasUserLikedPost,
   useLikePost,
   usePostComments,
   usePostLikeCount,
   usePosts,
   useSocialUser,
+  useSubmitDailyAnswer,
+  useTodayQuestion,
   useUnlikePost,
 } from "../hooks/useQueries";
 
@@ -31,6 +38,102 @@ function timeAgo(timestamp: bigint): string {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
+}
+
+function getTodayDateStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function DailyQuestionCard() {
+  const { userId, user } = useAuth();
+  const todayDate = getTodayDateStr();
+  const { data: question } = useTodayQuestion(todayDate);
+  const { data: hasAnswered } = useHasAnswered(question?.id ?? null, userId);
+  const { data: answers = [] } = useDailyAnswers(
+    hasAnswered ? (question?.id ?? null) : null,
+  );
+  const submitAnswer = useSubmitDailyAnswer();
+  const [answerText, setAnswerText] = useState("");
+
+  if (!question) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userId || !user || !answerText.trim()) return;
+    try {
+      await submitAnswer.mutateAsync({
+        questionId: question.id,
+        userId,
+        username: user.username,
+        answer: answerText.trim(),
+      });
+      setAnswerText("");
+      toast.success("Answer submitted!");
+    } catch {
+      toast.error("Failed to submit answer.");
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 rounded-2xl p-4 mb-6"
+      data-ocid="feed.daily_question.card"
+    >
+      <p className="text-xs font-semibold text-primary mb-1 uppercase tracking-wide">
+        🌐 Today&apos;s Question
+      </p>
+      <p className="font-display font-semibold text-foreground mb-3">
+        {question.question}
+      </p>
+
+      {!userId ? (
+        <p className="text-sm text-muted-foreground">Log in to answer</p>
+      ) : hasAnswered ? (
+        <>
+          <p className="text-xs text-muted-foreground mb-2">
+            You&apos;ve answered — see what others said:
+          </p>
+          <ScrollArea className="max-h-40">
+            <div className="space-y-2">
+              {answers.map((a) => (
+                <div
+                  key={a.id.toString()}
+                  className="flex gap-2 text-sm bg-card rounded-xl px-3 py-2"
+                >
+                  <span className="font-semibold text-foreground shrink-0">
+                    {a.username}
+                  </span>
+                  <span className="text-foreground/70">{a.answer}</span>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-2">
+          <Textarea
+            data-ocid="feed.daily_question.answer.textarea"
+            value={answerText}
+            onChange={(e) => setAnswerText(e.target.value)}
+            placeholder="Share your answer..."
+            className="rounded-xl min-h-16 text-sm bg-card"
+          />
+          <Button
+            type="submit"
+            data-ocid="feed.daily_question.answer.submit_button"
+            disabled={!answerText.trim() || submitAnswer.isPending}
+            size="sm"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
+          >
+            Submit Answer
+          </Button>
+        </form>
+      )}
+    </motion.div>
+  );
 }
 
 function PostCard({ post }: { post: Post }) {
@@ -101,7 +204,6 @@ function PostCard({ post }: { post: Post }) {
       animate={{ opacity: 1, y: 0 }}
       className="bg-card border border-border rounded-2xl overflow-hidden shadow-xs"
     >
-      {/* Author header */}
       <div className="flex items-center gap-3 px-4 py-3">
         <Link to="/user/$userId" params={{ userId: post.authorId.toString() }}>
           <Avatar className="w-9 h-9">
@@ -128,7 +230,6 @@ function PostCard({ post }: { post: Post }) {
         </span>
       </div>
 
-      {/* Post image */}
       <div className="aspect-square bg-muted">
         <img
           src={post.imageUrl}
@@ -137,7 +238,6 @@ function PostCard({ post }: { post: Post }) {
         />
       </div>
 
-      {/* Actions */}
       <div className="px-4 pt-3 pb-1 flex items-center gap-3">
         <button
           type="button"
@@ -164,14 +264,12 @@ function PostCard({ post }: { post: Post }) {
         </button>
       </div>
 
-      {/* Like count */}
       <div className="px-4 pb-1">
         <p className="text-sm font-semibold text-foreground">
           {likeCount.toString()} likes
         </p>
       </div>
 
-      {/* Caption */}
       {post.caption && (
         <div className="px-4 pb-3">
           <p className="text-sm text-foreground">
@@ -187,7 +285,6 @@ function PostCard({ post }: { post: Post }) {
         </div>
       )}
 
-      {/* Comments toggle */}
       {!commentsOpen && (
         <button
           type="button"
@@ -198,7 +295,6 @@ function PostCard({ post }: { post: Post }) {
         </button>
       )}
 
-      {/* Comments section */}
       <AnimatePresence>
         {commentsOpen && (
           <motion.div
@@ -272,7 +368,6 @@ export function Feed() {
   const [createOpen, setCreateOpen] = useState(false);
   const { data: posts = [], isLoading } = usePosts();
 
-  // Request notification permission when feed is viewed by a logged-in user
   useNotifications(!!userId);
 
   const sortedPosts = [...posts].sort((a, b) =>
@@ -280,78 +375,88 @@ export function Feed() {
   );
 
   return (
-    <main className="min-h-screen bg-background">
-      <div className="max-w-lg mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-display font-bold text-foreground">
-            Feed
-          </h1>
-          {userId && (
-            <Button
-              onClick={() => setCreateOpen(true)}
-              data-ocid="feed.create_post.button"
-              className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl gap-2"
-              size="sm"
-            >
-              <Plus className="w-4 h-4" />
-              New Post
-            </Button>
-          )}
-        </div>
+    <div className="relative min-h-screen">
+      {/* Dynamic background only on feed page */}
+      <DynamicBackground />
 
-        {/* Loading skeletons */}
-        {isLoading ? (
-          <div className="space-y-6">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="bg-card border border-border rounded-2xl overflow-hidden"
-                data-ocid="feed.loading_state"
-              >
-                <div className="flex items-center gap-3 p-4">
-                  <Skeleton className="w-9 h-9 rounded-full" />
-                  <div className="space-y-1">
-                    <Skeleton className="h-3 w-24 rounded" />
-                    <Skeleton className="h-3 w-16 rounded" />
-                  </div>
-                </div>
-                <Skeleton className="aspect-square w-full" />
-                <div className="p-4 space-y-2">
-                  <Skeleton className="h-4 w-16 rounded" />
-                  <Skeleton className="h-4 w-3/4 rounded" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : sortedPosts.length === 0 ? (
-          <div data-ocid="feed.empty_state" className="text-center py-20">
-            <div className="text-6xl mb-4">📸</div>
-            <h2 className="text-xl font-display font-semibold text-foreground mb-2">
-              No posts yet
-            </h2>
-            <p className="text-muted-foreground mb-6">
-              Be the first to share a moment with the world!
-            </p>
+      <main className="relative z-10">
+        <div className="max-w-lg mx-auto px-4 py-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-2xl font-display font-bold text-white drop-shadow-md">
+              World Feed
+            </h1>
             {userId && (
               <Button
                 onClick={() => setCreateOpen(true)}
-                data-ocid="feed.empty.create_post.button"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl gap-2"
+                data-ocid="feed.create_post.button"
+                className="bg-white/90 hover:bg-white text-foreground rounded-xl gap-2 shadow-md"
+                size="sm"
               >
                 <Plus className="w-4 h-4" />
-                Share a Post
+                New Post
               </Button>
             )}
           </div>
-        ) : (
-          <div className="space-y-6">
-            {sortedPosts.map((post) => (
-              <PostCard key={post.id.toString()} post={post} />
-            ))}
-          </div>
-        )}
-      </div>
+
+          {/* Daily Question */}
+          <DailyQuestionCard />
+
+          {/* Loading skeletons */}
+          {isLoading ? (
+            <div className="space-y-6">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="bg-card border border-border rounded-2xl overflow-hidden"
+                  data-ocid="feed.loading_state"
+                >
+                  <div className="flex items-center gap-3 p-4">
+                    <Skeleton className="w-9 h-9 rounded-full" />
+                    <div className="space-y-1">
+                      <Skeleton className="h-3 w-24 rounded" />
+                      <Skeleton className="h-3 w-16 rounded" />
+                    </div>
+                  </div>
+                  <Skeleton className="aspect-square w-full" />
+                  <div className="p-4 space-y-2">
+                    <Skeleton className="h-4 w-16 rounded" />
+                    <Skeleton className="h-4 w-3/4 rounded" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : sortedPosts.length === 0 ? (
+            <div data-ocid="feed.empty_state" className="text-center py-20">
+              <div className="bg-card/80 backdrop-blur-sm rounded-2xl p-8 inline-block">
+                <div className="text-6xl mb-4">📸</div>
+                <h2 className="text-xl font-display font-semibold text-foreground mb-2">
+                  No posts yet
+                </h2>
+                <p className="text-muted-foreground mb-6">
+                  Be the first to share a moment with the world!
+                </p>
+                {userId && (
+                  <Button
+                    onClick={() => setCreateOpen(true)}
+                    data-ocid="feed.empty.create_post.button"
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Share a Post
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {sortedPosts.map((post) => (
+                <PostCard key={post.id.toString()} post={post} />
+              ))}
+            </div>
+          )}
+        </div>
+      </main>
 
       {userId && (
         <CreatePostModal
@@ -360,6 +465,6 @@ export function Feed() {
           userId={userId}
         />
       )}
-    </main>
+    </div>
   );
 }

@@ -10,6 +10,63 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export interface Badge {
+  'id' : bigint,
+  'badgeType' : string,
+  'userId' : bigint,
+  'color' : string,
+  'awardedAt' : bigint,
+  'awardedBy' : string,
+  'reason' : string,
+}
+export interface DailyAnswer {
+  'id' : bigint,
+  'username' : string,
+  'userId' : bigint,
+  'createdAt' : bigint,
+  'answer' : string,
+  'questionId' : bigint,
+}
+export interface DailyQuestion {
+  'id' : bigint,
+  'postedBy' : string,
+  'question' : string,
+  'date' : string,
+  'createdAt' : bigint,
+}
+export interface FriendRequest {
+  'id' : bigint,
+  'status' : { 'pending' : null } |
+    { 'rejected' : null } |
+    { 'accepted' : null },
+  'createdAt' : bigint,
+  'toUserId' : bigint,
+  'fromUserId' : bigint,
+}
+export interface Notification {
+  'id' : bigint,
+  'notifType' : string,
+  'userId' : bigint,
+  'createdAt' : bigint,
+  'isRead' : boolean,
+  'message' : string,
+  'relatedId' : [] | [bigint],
+}
+export interface Post {
+  'id' : bigint,
+  'authorId' : bigint,
+  'createdAt' : bigint,
+  'imageUrl' : string,
+  'caption' : string,
+}
+export interface PostComment {
+  'id' : bigint,
+  'authorId' : bigint,
+  'createdAt' : bigint,
+  'text' : string,
+  'authorName' : string,
+  'postId' : bigint,
+}
 export interface Profile {
   'id' : bigint,
   'bio' : string,
@@ -28,7 +85,22 @@ export interface Review {
   'comment' : string,
   'rating' : bigint,
 }
-export interface UserProfile { 'name' : string }
+export interface SocialUser {
+  'id' : bigint,
+  'bio' : string,
+  'portfolioLink' : [] | [string],
+  'userType' : string,
+  'activityScore' : bigint,
+  'country' : string,
+  'username' : string,
+  'displayName' : string,
+  'createdAt' : bigint,
+  'email' : string,
+  'avatarUrl' : string,
+  'passwordHash' : string,
+  'stageName' : [] | [string],
+}
+export interface UserProfile { 'socialUserId' : [] | [bigint] }
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
@@ -60,29 +132,87 @@ export interface _SERVICE {
   >,
   '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  'acceptFriendRequest' : ActorMethod<[bigint], undefined>,
+  'addPostComment' : ActorMethod<[bigint, bigint, string, string], bigint>,
   'addReview' : ActorMethod<[bigint, string, bigint, string], bigint>,
+  'areFriends' : ActorMethod<[bigint, bigint], boolean>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'awardBadge' : ActorMethod<[bigint, string, string, string, string], bigint>,
+  'createNotification' : ActorMethod<
+    [bigint, string, string, [] | [bigint]],
+    bigint
+  >,
+  'createPost' : ActorMethod<[bigint, string, string], bigint>,
   'createProfile' : ActorMethod<
     [string, string, string, string, [] | [string], [] | [string]],
     bigint
   >,
+  'deletePost' : ActorMethod<[bigint], undefined>,
+  'deletePostComment' : ActorMethod<[bigint], undefined>,
   'deleteProfile' : ActorMethod<[bigint], undefined>,
+  'getAllBadges' : ActorMethod<[], Array<Badge>>,
+  'getAllSocialUsers' : ActorMethod<[], Array<SocialUser>>,
   'getAverageRating' : ActorMethod<[bigint], [] | [number]>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getCountries' : ActorMethod<[], Array<[string, bigint]>>,
+  'getDailyAnswers' : ActorMethod<[bigint], Array<DailyAnswer>>,
+  'getFriendRequestsReceived' : ActorMethod<[bigint], Array<FriendRequest>>,
+  'getFriendRequestsSent' : ActorMethod<[bigint], Array<FriendRequest>>,
+  'getFriends' : ActorMethod<[bigint], Array<bigint>>,
+  'getLeaderboard' : ActorMethod<[], Array<SocialUser>>,
   'getLikeCount' : ActorMethod<[bigint], bigint>,
+  'getNotifications' : ActorMethod<[bigint], Array<Notification>>,
+  'getPostComments' : ActorMethod<[bigint], Array<PostComment>>,
+  'getPostLikeCount' : ActorMethod<[bigint], bigint>,
+  'getPosts' : ActorMethod<[], Array<Post>>,
+  'getPostsByUser' : ActorMethod<[bigint], Array<Post>>,
   'getProfile' : ActorMethod<[bigint], Profile>,
   'getProfiles' : ActorMethod<[], Array<Profile>>,
   'getProfilesByCountry' : ActorMethod<[string], Array<Profile>>,
   'getReviews' : ActorMethod<[bigint], Array<Review>>,
+  'getSocialUser' : ActorMethod<[bigint], SocialUser>,
+  'getTodayQuestion' : ActorMethod<[string], [] | [DailyQuestion]>,
+  'getUnreadCount' : ActorMethod<[bigint], bigint>,
+  'getUserBadges' : ActorMethod<[bigint], Array<Badge>>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
+  'hasSocialUserAnswered' : ActorMethod<[bigint, bigint], boolean>,
+  'hasUserLikedPost' : ActorMethod<[bigint, bigint], boolean>,
+  'incrementUserActivity' : ActorMethod<[bigint, bigint], undefined>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
+  'likePost' : ActorMethod<[bigint, bigint], undefined>,
   'likeProfile' : ActorMethod<[bigint], undefined>,
+  'loginUser' : ActorMethod<[string, string], [] | [bigint]>,
+  'markAllNotificationsRead' : ActorMethod<[bigint], undefined>,
+  'markNotificationRead' : ActorMethod<[bigint], undefined>,
+  'postDailyQuestion' : ActorMethod<[string, string, string], bigint>,
+  'registerUser' : ActorMethod<
+    [string, string, string, string, string, string, string],
+    bigint
+  >,
+  'rejectFriendRequest' : ActorMethod<[bigint], undefined>,
+  'removeBadge' : ActorMethod<[bigint], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'searchProfiles' : ActorMethod<[string], Array<Profile>>,
+  'sendFriendRequest' : ActorMethod<[bigint, bigint], bigint>,
+  'submitDailyAnswer' : ActorMethod<[bigint, bigint, string, string], bigint>,
+  'unlikePost' : ActorMethod<[bigint, bigint], undefined>,
   'updateProfile' : ActorMethod<
     [bigint, string, string, string, string, [] | [string], [] | [string]],
+    undefined
+  >,
+  'updateSocialUser' : ActorMethod<
+    [
+      bigint,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      [] | [string],
+      [] | [string],
+    ],
     undefined
   >,
 }

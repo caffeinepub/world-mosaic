@@ -37,6 +37,7 @@ import {
   LogOut,
   Pencil,
   Plus,
+  Star,
   Trash2,
   Users,
 } from "lucide-react";
@@ -45,10 +46,20 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { Profile } from "../backend.d";
 import {
+  BADGE_COLORS,
+  BADGE_TYPES,
+  BadgeDisplay,
+} from "../components/BadgeDisplay";
+import {
+  useAllSocialUsers,
+  useAwardBadge,
   useCreateProfile,
   useDeleteProfile,
+  usePostDailyQuestion,
   useProfiles,
+  useRemoveBadge,
   useUpdateProfile,
+  useUserBadges,
 } from "../hooks/useQueries";
 import { ALL_COUNTRIES, getFlagEmoji, getInitials } from "../utils/flags";
 
@@ -103,7 +114,6 @@ function PasswordGate({ onSuccess }: { onSuccess: () => void }) {
         className="w-full max-w-sm"
       >
         <div className="bg-card border border-border rounded-3xl p-8 shadow-xl">
-          {/* Logo */}
           <div className="flex flex-col items-center mb-8">
             <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mb-4 shadow-md">
               <Globe className="w-9 h-9 text-primary-foreground" />
@@ -113,13 +123,6 @@ function PasswordGate({ onSuccess }: { onSuccess: () => void }) {
             </h1>
             <p className="text-sm text-muted-foreground mt-1">Admin Panel</p>
           </div>
-
-          <h2 className="text-xl font-display font-semibold text-foreground mb-1">
-            Admin Access
-          </h2>
-          <p className="text-sm text-muted-foreground mb-6">
-            Enter the admin password to manage World Mosaic
-          </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
@@ -136,13 +139,12 @@ function PasswordGate({ onSuccess }: { onSuccess: () => void }) {
                   }}
                   placeholder="Enter admin password"
                   className="rounded-xl pr-10"
-                  autoFocus
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                   onClick={() => setShowPassword((v) => !v)}
-                  data-ocid="admin.password.toggle"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {showPassword ? (
                     <EyeOff className="w-4 h-4" />
@@ -153,14 +155,13 @@ function PasswordGate({ onSuccess }: { onSuccess: () => void }) {
               </div>
               {error && (
                 <p
-                  className="text-sm text-destructive"
                   data-ocid="admin.password.error_state"
+                  className="text-sm text-destructive"
                 >
                   {error}
                 </p>
               )}
             </div>
-
             <Button
               type="submit"
               data-ocid="admin.password.submit_button"
@@ -168,7 +169,7 @@ function PasswordGate({ onSuccess }: { onSuccess: () => void }) {
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl gap-2"
             >
               {isChecking && <Loader2 className="w-4 h-4 animate-spin" />}
-              Sign In
+              Access Admin Panel
             </Button>
           </form>
         </div>
@@ -177,20 +178,284 @@ function PasswordGate({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
+function AwardBadgeTab() {
+  const { data: socialUsers = [] } = useAllSocialUsers();
+  const awardBadge = useAwardBadge();
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [badgeType, setBadgeType] = useState("");
+  const [badgeColor, setBadgeColor] = useState("gold");
+  const [reason, setReason] = useState("");
+
+  const selectedUserBigInt = selectedUserId ? BigInt(selectedUserId) : null;
+  const { data: userBadges = [] } = useUserBadges(selectedUserBigInt);
+  const removeBadge = useRemoveBadge();
+
+  const handleAward = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserId || !badgeType) {
+      toast.error("Please select a user and badge type.");
+      return;
+    }
+    try {
+      await awardBadge.mutateAsync({
+        userId: BigInt(selectedUserId),
+        badgeType,
+        color: badgeColor,
+        awardedBy: "Admin",
+        reason,
+      });
+      toast.success("Badge awarded!");
+      setReason("");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to award badge.";
+      toast.error(msg);
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Award form */}
+      <div className="bg-card border border-border rounded-2xl p-6">
+        <h3 className="font-display font-semibold text-lg mb-4 flex items-center gap-2">
+          <Star className="w-5 h-5 text-yellow-500" />
+          Award a Badge
+        </h3>
+        <form onSubmit={handleAward} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Select User *</Label>
+            <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+              <SelectTrigger
+                data-ocid="admin.badge.user.select"
+                className="rounded-xl"
+              >
+                <SelectValue placeholder="Choose a user..." />
+              </SelectTrigger>
+              <SelectContent>
+                {socialUsers.map((u) => (
+                  <SelectItem key={u.id.toString()} value={u.id.toString()}>
+                    {u.displayName} (@{u.username}) — {u.country}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Badge Type *</Label>
+            <Select value={badgeType} onValueChange={setBadgeType}>
+              <SelectTrigger
+                data-ocid="admin.badge.type.select"
+                className="rounded-xl"
+              >
+                <SelectValue placeholder="Choose badge type..." />
+              </SelectTrigger>
+              <SelectContent>
+                {BADGE_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Badge Color *</Label>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(BADGE_COLORS).map(([name, hex]) => (
+                <button
+                  key={name}
+                  type="button"
+                  data-ocid={`admin.badge.color.${name}.toggle`}
+                  onClick={() => setBadgeColor(name)}
+                  className={`w-8 h-8 rounded-full border-2 transition-all ${
+                    badgeColor === name
+                      ? "scale-125 border-foreground"
+                      : "border-transparent"
+                  }`}
+                  style={{ backgroundColor: hex }}
+                  title={name}
+                />
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground capitalize">
+              Selected: {badgeColor}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="badge-reason">Reason (optional)</Label>
+            <Textarea
+              id="badge-reason"
+              data-ocid="admin.badge.reason.textarea"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Why is this badge being awarded?"
+              className="rounded-xl min-h-20"
+            />
+          </div>
+
+          <Button
+            type="submit"
+            data-ocid="admin.badge.submit_button"
+            disabled={awardBadge.isPending || !selectedUserId || !badgeType}
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl gap-2"
+          >
+            {awardBadge.isPending && (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            )}
+            Award Badge
+          </Button>
+        </form>
+      </div>
+
+      {/* User's current badges */}
+      <div className="bg-card border border-border rounded-2xl p-6">
+        <h3 className="font-display font-semibold text-lg mb-4">
+          {selectedUserId
+            ? `Badges for ${socialUsers.find((u) => u.id.toString() === selectedUserId)?.displayName ?? "User"}`
+            : "Select a user to view badges"}
+        </h3>
+        {!selectedUserId ? (
+          <p className="text-muted-foreground text-sm">
+            Choose a user on the left to manage their badges.
+          </p>
+        ) : userBadges.length === 0 ? (
+          <p
+            data-ocid="admin.badge.empty_state"
+            className="text-muted-foreground text-sm"
+          >
+            No badges yet.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {userBadges.map((b, i) => (
+              <div
+                key={b.id.toString()}
+                data-ocid={`admin.badge.item.${i + 1}`}
+                className="flex items-center gap-3 p-3 rounded-xl bg-muted/40"
+              >
+                <BadgeDisplay badge={b} size="md" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold">{b.badgeType}</p>
+                  {b.reason && (
+                    <p className="text-xs text-muted-foreground truncate">
+                      {b.reason}
+                    </p>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  data-ocid={`admin.badge.delete_button.${i + 1}`}
+                  onClick={() =>
+                    removeBadge
+                      .mutateAsync(b.id)
+                      .then(() => toast.success("Badge removed."))
+                      .catch((err: unknown) => {
+                        const msg =
+                          err instanceof Error
+                            ? err.message
+                            : "Failed to remove badge.";
+                        toast.error(msg);
+                      })
+                  }
+                  className="text-destructive hover:bg-destructive/10 rounded-xl"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DailyQuestionTab() {
+  const postQuestion = usePostDailyQuestion();
+  const [question, setQuestion] = useState("");
+
+  const todayDate = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!question.trim()) {
+      toast.error("Please enter a question.");
+      return;
+    }
+    try {
+      await postQuestion.mutateAsync({
+        question: question.trim(),
+        date: todayDate,
+        postedBy: "Admin",
+      });
+      toast.success("Daily question posted!");
+      setQuestion("");
+    } catch {
+      toast.error("Failed to post question.");
+    }
+  };
+
+  return (
+    <div className="max-w-lg">
+      <div className="bg-card border border-border rounded-2xl p-6">
+        <h3 className="font-display font-semibold text-lg mb-1">
+          Post Today&apos;s Question
+        </h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          Date: <strong>{todayDate}</strong>
+        </p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="daily-question">Question *</Label>
+            <Textarea
+              id="daily-question"
+              data-ocid="admin.daily_question.textarea"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              placeholder="What would you ask the World Mosaic community today?"
+              className="rounded-xl min-h-28"
+            />
+          </div>
+          <Button
+            type="submit"
+            data-ocid="admin.daily_question.submit_button"
+            disabled={postQuestion.isPending || !question.trim()}
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl gap-2"
+          >
+            {postQuestion.isPending && (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            )}
+            Post Question
+          </Button>
+        </form>
+        <p className="text-xs text-muted-foreground mt-4">
+          ℹ️ Only one question per day. Posting a new question replaces the
+          previous one for today.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function Admin() {
   const [authenticated, setAuthenticated] = useState(
     () => sessionStorage.getItem(SESSION_KEY) === "true",
   );
+  const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Profile | null>(null);
+  const [form, setForm] = useState<ProfileForm>(emptyForm);
 
   const { data: profiles, isLoading: profilesLoading } = useProfiles();
   const createProfile = useCreateProfile();
   const updateProfile = useUpdateProfile();
   const deleteProfile = useDeleteProfile();
-
-  const [showForm, setShowForm] = useState(false);
-  const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Profile | null>(null);
-  const [form, setForm] = useState<ProfileForm>(emptyForm);
 
   const handleSignOut = () => {
     sessionStorage.removeItem(SESSION_KEY);
@@ -278,7 +543,7 @@ export function Admin() {
               Admin Panel
             </h1>
             <p className="text-muted-foreground">
-              Manage World Mosaic profiles and website content.
+              Manage World Mosaic profiles, badges, and daily questions.
             </p>
           </div>
           <Button
@@ -295,7 +560,7 @@ export function Admin() {
 
       <section className="container max-w-7xl mx-auto px-4 py-8 pb-20">
         <Tabs defaultValue="profiles" data-ocid="admin.tab">
-          <TabsList className="mb-6 rounded-xl">
+          <TabsList className="mb-6 rounded-xl flex-wrap h-auto">
             <TabsTrigger
               value="profiles"
               data-ocid="admin.profiles.tab"
@@ -304,9 +569,24 @@ export function Admin() {
               <Users className="w-4 h-4" />
               Profiles
             </TabsTrigger>
+            <TabsTrigger
+              value="badges"
+              data-ocid="admin.badges.tab"
+              className="rounded-lg gap-2"
+            >
+              <Star className="w-4 h-4" />
+              Badges
+            </TabsTrigger>
+            <TabsTrigger
+              value="daily"
+              data-ocid="admin.daily.tab"
+              className="rounded-lg gap-2"
+            >
+              🌐 Daily Question
+            </TabsTrigger>
           </TabsList>
 
-          {/* ── Profiles Tab ── */}
+          {/* Profiles Tab */}
           <TabsContent value="profiles">
             <div className="flex justify-end mb-4">
               <Button
@@ -331,22 +611,20 @@ export function Admin() {
                 data-ocid="admin.empty_state"
                 className="text-center py-20 text-muted-foreground"
               >
-                <div className="text-6xl mb-4">📋</div>
+                <div className="text-5xl mb-4">👤</div>
                 <p className="text-lg font-medium">No profiles yet</p>
-                <p className="text-sm mt-1">
-                  Click "Add Profile" to create the first one.
-                </p>
+                <p className="text-sm mt-1">Add the first member profile</p>
               </div>
             ) : (
-              <div className="grid gap-4">
+              <div className="space-y-3">
                 {(profiles ?? []).map((profile, i) => (
                   <motion.div
                     key={profile.id.toString()}
+                    data-ocid={`admin.profile.item.${i + 1}`}
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.04 }}
-                    data-ocid={`admin.profile.item.${i + 1}`}
-                    className="bg-card border border-border rounded-2xl p-4 flex items-center gap-4"
+                    transition={{ delay: i * 0.03 }}
+                    className="flex items-center gap-4 p-4 bg-card border border-border rounded-2xl shadow-xs"
                   >
                     <Avatar className="w-12 h-12 flex-shrink-0">
                       <AvatarImage src={profile.photoUrl} alt={profile.name} />
@@ -397,6 +675,16 @@ export function Admin() {
               </div>
             )}
           </TabsContent>
+
+          {/* Badges Tab */}
+          <TabsContent value="badges">
+            <AwardBadgeTab />
+          </TabsContent>
+
+          {/* Daily Question Tab */}
+          <TabsContent value="daily">
+            <DailyQuestionTab />
+          </TabsContent>
         </Tabs>
       </section>
 
@@ -404,7 +692,7 @@ export function Admin() {
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent
           data-ocid="admin.form.dialog"
-          className="max-w-lg rounded-2xl"
+          className="max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto"
         >
           <DialogHeader>
             <DialogTitle className="font-display text-xl">
@@ -413,7 +701,6 @@ export function Admin() {
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-            {/* Photo */}
             <div className="space-y-2">
               <Label htmlFor="admin-photo">Photo URL</Label>
               <div className="flex gap-3 items-center">
@@ -436,7 +723,6 @@ export function Admin() {
               </div>
             </div>
 
-            {/* Name */}
             <div className="space-y-2">
               <Label htmlFor="admin-name">Name *</Label>
               <Input
@@ -450,7 +736,6 @@ export function Admin() {
               />
             </div>
 
-            {/* Country */}
             <div className="space-y-2">
               <Label htmlFor="admin-country">Country *</Label>
               <Input
@@ -470,7 +755,6 @@ export function Admin() {
               </datalist>
             </div>
 
-            {/* Bio */}
             <div className="space-y-2">
               <Label htmlFor="admin-bio">Bio</Label>
               <Textarea
@@ -483,7 +767,6 @@ export function Admin() {
               />
             </div>
 
-            {/* Email (optional) */}
             <div className="space-y-2">
               <Label htmlFor="admin-email">Email (optional)</Label>
               <Input
@@ -497,7 +780,6 @@ export function Admin() {
               />
             </div>
 
-            {/* Social Media */}
             <div className="space-y-2">
               <Label htmlFor="admin-social">Social Media URL</Label>
               <Input
@@ -551,7 +833,7 @@ export function Admin() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete{" "}
-              <strong>{deleteTarget?.name}</strong>'s profile? This action
+              <strong>{deleteTarget?.name}</strong>&apos;s profile? This action
               cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -567,11 +849,7 @@ export function Admin() {
               onClick={handleDelete}
               className="bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-xl"
             >
-              {deleteProfile.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                "Delete"
-              )}
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -8,6 +8,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Upload } from "lucide-react";
@@ -32,7 +39,6 @@ export function AuthModal({
   const [tab, setTab] = useState<string>(defaultTab);
   const [isPending, setIsPending] = useState(false);
 
-  // Sync tab when modal opens
   useEffect(() => {
     if (open) setTab(defaultTab);
   }, [open, defaultTab]);
@@ -45,8 +51,12 @@ export function AuthModal({
   const [signupUsername, setSignupUsername] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupName, setSignupName] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
   const [signupCountry, setSignupCountry] = useState("");
   const [signupBio, setSignupBio] = useState("");
+  const [userType, setUserType] = useState("member");
+  const [stageName, setStageName] = useState("");
+  const [portfolioLink, setPortfolioLink] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarUploading, setAvatarUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -86,15 +96,31 @@ export function AuthModal({
       toast.error("Username, password, name, and country are required.");
       return;
     }
+    if (signupEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(signupEmail)) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
+    if (userType === "actor" && !stageName.trim()) {
+      toast.error("Stage name is required for Actor accounts.");
+      return;
+    }
+    if (userType === "actor" && !portfolioLink.trim()) {
+      toast.error("Portfolio link is required for Actor accounts.");
+      return;
+    }
     setIsPending(true);
     try {
       await signup({
         username: signupUsername,
         password: signupPassword,
         displayName: signupName,
+        email: signupEmail,
         country: signupCountry,
         bio: signupBio,
         avatarUrl,
+        userType,
+        stageName,
+        portfolioLink,
       });
       toast.success("Account created! Welcome to World Mosaic!");
       onOpenChange(false);
@@ -109,7 +135,10 @@ export function AuthModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent data-ocid="auth.dialog" className="max-w-md rounded-2xl">
+      <DialogContent
+        data-ocid="auth.dialog"
+        className="max-w-md rounded-2xl max-h-[90vh] overflow-y-auto"
+      >
         <DialogHeader>
           <DialogTitle className="font-display text-xl text-center">
             World Mosaic
@@ -220,6 +249,23 @@ export function AuthModal({
                 </Button>
               </div>
 
+              {/* User Type */}
+              <div className="space-y-2">
+                <Label htmlFor="signup-usertype">Account Type *</Label>
+                <Select value={userType} onValueChange={setUserType}>
+                  <SelectTrigger
+                    data-ocid="auth.signup.usertype.select"
+                    className="rounded-xl"
+                  >
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="member">👤 Member</SelectItem>
+                    <SelectItem value="actor">🎭 Actor</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="signup-username">Username *</Label>
                 <Input
@@ -257,6 +303,19 @@ export function AuthModal({
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="signup-email">Email *</Label>
+                <Input
+                  id="signup-email"
+                  type="email"
+                  data-ocid="auth.signup.email.input"
+                  value={signupEmail}
+                  onChange={(e) => setSignupEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  className="rounded-xl"
+                  autoComplete="email"
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="signup-country">Country *</Label>
                 <Input
                   id="signup-country"
@@ -284,6 +343,37 @@ export function AuthModal({
                   className="rounded-xl min-h-20"
                 />
               </div>
+
+              {/* Actor-specific fields */}
+              {userType === "actor" && (
+                <div className="space-y-4 p-4 bg-purple-50 border border-purple-200 rounded-xl">
+                  <p className="text-sm font-semibold text-purple-700">
+                    🎭 Actor Details
+                  </p>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-stagename">Stage Name *</Label>
+                    <Input
+                      id="signup-stagename"
+                      data-ocid="auth.signup.stagename.input"
+                      value={stageName}
+                      onChange={(e) => setStageName(e.target.value)}
+                      placeholder="Your stage / artist name"
+                      className="rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-portfolio">Portfolio Link *</Label>
+                    <Input
+                      id="signup-portfolio"
+                      data-ocid="auth.signup.portfolio.input"
+                      value={portfolioLink}
+                      onChange={(e) => setPortfolioLink(e.target.value)}
+                      placeholder="https://yourportfolio.com"
+                      className="rounded-xl"
+                    />
+                  </div>
+                </div>
+              )}
 
               <p className="text-xs text-muted-foreground bg-muted/50 rounded-xl p-3">
                 By signing up, you agree to share your content publicly on World

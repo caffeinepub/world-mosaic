@@ -1,31 +1,38 @@
-# World Mosaic – Social Feed & Mobile Navigation Update
+# World Mosaic
 
 ## Current State
-The app has a working social layer: user auth (signup/login), a Feed page with posts, likes, and comments, and a Navbar. After login, users stay on the same page. There is no bottom navigation. No push notification system exists.
+
+World Mosaic is a full social platform with:
+- Custom username/password auth stored in localStorage
+- Backend using ICP AccessControl (principal-based) for permission gating
+- Blob storage for image uploads via `uploadFileToStorage`
+- Badge awarding by admin (password-protected frontend panel)
+- Profile editing with avatar upload
+- Post creation with image upload
+
+**Root bug**: The backend uses `AccessControl.hasPermission(caller, #user)` and `AccessControl.isAdmin(caller)` but the app never registers users with the ICP principal system. The caller is always the anonymous principal, so EVERY write operation (create post, like, comment, award badge, update profile, etc.) throws "Unauthorized" and fails silently.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Redirect to `/feed` after successful login or signup
-- Bottom navigation bar (mobile Instagram-style) visible only when logged in: Home (feed), + Post (create), Profile
-- Web Push / Browser Notification system: request permission on login, send local notifications when someone likes a post, comments, or new posts appear (using Notification API + polling since no server push backend)
-- "+ Post" quick-action in the bottom nav opens CreatePostModal
-- Notification bell icon in the top navbar showing unread count badge
+- Client-side file type validation (JPEG, PNG, WebP) and 10 MB size limit before upload
+- Upload progress indicator in CreatePostModal and avatar upload
+- AuthContext refresh of `user` state after profile update
+- Clear success/failure toast messages for all badge/post/profile operations
 
 ### Modify
-- AuthContext: after login/signup, navigate to `/feed`
-- App.tsx: render bottom nav bar only for logged-in users; add padding-bottom to main content on mobile so it doesn't hide behind the bottom nav
-- Navbar: hide feed/profile nav items on mobile since bottom nav handles those; add notification bell with badge for logged-in users
-- Feed page: make it the primary post-login landing page
+- Backend: Remove all `AccessControl.hasPermission` and `AccessControl.isAdmin` guards. Replace with lightweight data-level validation (existence checks, basic sanity checks). App-level auth (who can do what) is enforced in the frontend.
+- CreatePostModal: validate file type and size before upload; show upload progress
+- UserProfile EditProfileDialog: invalidate `authUser` query / update AuthContext after save
+- AuthContext: expose a `refreshUser` function; call it after `updateSocialUser`
 
 ### Remove
-- Nothing removed from existing features
+- Nothing removed
 
 ## Implementation Plan
-1. Add `useNotifications` hook to manage browser notification permissions and send local notifications
-2. Create `BottomNav` component with Home, + (CreatePost), Profile icons
-3. Update `AuthContext` to navigate to `/feed` after login/signup (pass a `navigate` callback or use router)
-4. Update `App.tsx` root layout to include `BottomNav` for logged-in users with `pb-16` padding on mobile
-5. Update `Navbar` to add notification bell with badge for mobile/desktop when logged in
-6. Wire notification triggers: after likePost, addComment, and on new post creation, fire browser notification to the post author (stored locally)
-7. Add notification permission request on first login
+
+1. Rewrite `src/backend/main.mo` - remove all AccessControl permission checks from write methods (keep the mixin include for compatibility but don't gate on it). Keep data-validation traps (e.g. profile not found, rating range).
+2. Update `CreatePostModal` - add file type/size validation, wire `onProgress` to show % indicator.
+3. Update `AuthContext` - add `refreshUser()`, call after signup/login, expose via context.
+4. Update `UserProfile` EditProfileDialog - call `refreshUser` from AuthContext after save so navbar/avatar updates instantly.
+5. Validate and build.

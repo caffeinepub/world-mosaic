@@ -18,8 +18,10 @@ import { Admin } from "./pages/Admin";
 import { Browse } from "./pages/Browse";
 import { Contact } from "./pages/Contact";
 import { Countries } from "./pages/Countries";
+import { Explore } from "./pages/Explore";
 import { Feed } from "./pages/Feed";
 import { Home } from "./pages/Home";
+import { Leaderboard } from "./pages/Leaderboard";
 import { ProfileDetail } from "./pages/ProfileDetail";
 import { UserProfile } from "./pages/UserProfile";
 
@@ -112,6 +114,18 @@ const userProfileRoute = createRoute({
   component: UserProfile,
 });
 
+const exploreRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/explore",
+  component: Explore,
+});
+
+const leaderboardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/leaderboard",
+  component: Leaderboard,
+});
+
 const routeTree = rootRoute.addChildren([
   homeRoute,
   browseRoute,
@@ -122,6 +136,8 @@ const routeTree = rootRoute.addChildren([
   adminRoute,
   feedRoute,
   userProfileRoute,
+  exploreRoute,
+  leaderboardRoute,
 ]);
 
 const router = createRouter({ routeTree });
