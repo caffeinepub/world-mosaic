@@ -214,7 +214,7 @@ export function Admin() {
       country: profile.country,
       photoUrl: profile.photoUrl,
       bio: profile.bio,
-      email: profile.email,
+      email: profile.email ?? "",
       socialMedia: profile.socialMedia ?? "",
     });
     setShowForm(true);
@@ -222,8 +222,8 @@ export function Admin() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.country || !form.email) {
-      toast.error("Name, country, and email are required.");
+    if (!form.name || !form.country) {
+      toast.error("Name and country are required.");
       return;
     }
     try {
@@ -234,7 +234,7 @@ export function Admin() {
           country: form.country,
           photoUrl: form.photoUrl,
           bio: form.bio,
-          email: form.email,
+          email: form.email || null,
           socialMedia: form.socialMedia || null,
         });
         toast.success("Profile updated!");
@@ -244,7 +244,7 @@ export function Admin() {
           country: form.country,
           photoUrl: form.photoUrl,
           bio: form.bio,
-          email: form.email,
+          email: form.email || null,
           socialMedia: form.socialMedia || null,
         });
         toast.success("Profile created!");
@@ -365,9 +365,11 @@ export function Admin() {
                         >
                           {getFlagEmoji(profile.country)} {profile.country}
                         </Badge>
-                        <span className="text-xs text-muted-foreground truncate hidden sm:block">
-                          {profile.email}
-                        </span>
+                        {profile.email && (
+                          <span className="text-xs text-muted-foreground truncate hidden sm:block">
+                            {profile.email}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
@@ -481,9 +483,9 @@ export function Admin() {
               />
             </div>
 
-            {/* Email */}
+            {/* Email (optional) */}
             <div className="space-y-2">
-              <Label htmlFor="admin-email">Email *</Label>
+              <Label htmlFor="admin-email">Email (optional)</Label>
               <Input
                 id="admin-email"
                 type="email"
@@ -492,7 +494,6 @@ export function Admin() {
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 placeholder="contact@example.com"
                 className="rounded-xl"
-                required
               />
             </div>
 

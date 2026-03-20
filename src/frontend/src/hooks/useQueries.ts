@@ -1,6 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Profile } from "../backend.d";
+import type {
+  backendInterface as FullBackend,
+  Post,
+  PostComment,
+  Profile,
+  Review,
+  SocialUser,
+} from "../backend.d";
 import { useActor } from "./useActor";
+
+// ── Existing profile hooks ──────────────────────────────────────────────────
 
 export function useProfiles() {
   const { actor, isFetching } = useActor();
@@ -85,7 +94,7 @@ export function useCreateProfile() {
       country: string;
       photoUrl: string;
       bio: string;
-      email: string;
+      email: string | null;
       socialMedia: string | null;
     }) => {
       if (!actor) throw new Error("No actor");
@@ -115,7 +124,7 @@ export function useUpdateProfile() {
       country: string;
       photoUrl: string;
       bio: string;
-      email: string;
+      email: string | null;
       socialMedia: string | null;
     }) => {
       if (!actor) throw new Error("No actor");
@@ -147,6 +156,239 @@ export function useDeleteProfile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profiles"] });
       queryClient.invalidateQueries({ queryKey: ["countries"] });
+    },
+  });
+}
+
+export function useReviews(profileId: bigint | undefined) {
+  const { actor, isFetching } = useActor();
+  return useQuery<Review[]>({
+    queryKey: ["reviews", profileId?.toString()],
+    queryFn: async () => {
+      if (!actor || profileId === undefined) return [];
+      return actor.getReviews(profileId);
+    },
+    enabled: !!actor && !isFetching && profileId !== undefined,
+  });
+}
+
+export function useLikeCount(profileId: bigint | undefined) {
+  const { actor, isFetching } = useActor();
+  return useQuery<bigint>({
+    queryKey: ["likeCount", profileId?.toString()],
+    queryFn: async () => {
+      if (!actor || profileId === undefined) return BigInt(0);
+      return actor.getLikeCount(profileId);
+    },
+    enabled: !!actor && !isFetching && profileId !== undefined,
+  });
+}
+
+export function useAddReview(profileId: bigint) {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      authorName: string;
+      rating: bigint;
+      comment: string;
+    }) => {
+      if (!actor) throw new Error("No actor");
+      return actor.addReview(
+        profileId,
+        data.authorName,
+        data.rating,
+        data.comment,
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["reviews", profileId.toString()],
+      });
+    },
+  });
+}
+
+export function useLikeProfile(profileId: bigint) {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("No actor");
+      return actor.likeProfile(profileId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["likeCount", profileId.toString()],
+      });
+    },
+  });
+}
+
+// ── Social user hooks ───────────────────────────────────────────────────────
+
+export function useSocialUser(userId: bigint | null) {
+  const { actor: rawActor, isFetching } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  return useQuery<SocialUser | null>({
+    queryKey: ["socialUser", userId?.toString()],
+    queryFn: async () => {
+      if (!actor || !userId) return null;
+      return actor.getSocialUser(userId);
+    },
+    enabled: !!actor && !isFetching && !!userId,
+  });
+}
+
+// ── Post hooks ──────────────────────────────────────────────────────────────
+
+export function usePosts() {
+  const { actor: rawActor, isFetching } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  return useQuery<Post[]>({
+    queryKey: ["posts"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getPosts();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function usePostsByUser(userId: bigint | null) {
+  const { actor: rawActor, isFetching } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  return useQuery<Post[]>({
+    queryKey: ["posts", "user", userId?.toString()],
+    queryFn: async () => {
+      if (!actor || !userId) return [];
+      return actor.getPostsByUser(userId);
+    },
+    enabled: !!actor && !isFetching && !!userId,
+  });
+}
+
+export function usePostLikeCount(postId: bigint) {
+  const { actor: rawActor, isFetching } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  return useQuery<bigint>({
+    queryKey: ["postLikeCount", postId.toString()],
+    queryFn: async () => {
+      if (!actor) return BigInt(0);
+      return actor.getPostLikeCount(postId);
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function usePostComments(postId: bigint, enabled: boolean) {
+  const { actor: rawActor, isFetching } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  return useQuery<PostComment[]>({
+    queryKey: ["postComments", postId.toString()],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getPostComments(postId);
+    },
+    enabled: !!actor && !isFetching && enabled,
+  });
+}
+
+export function useHasUserLikedPost(postId: bigint, userId: bigint | null) {
+  const { actor: rawActor, isFetching } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  return useQuery<boolean>({
+    queryKey: ["hasLiked", postId.toString(), userId?.toString()],
+    queryFn: async () => {
+      if (!actor || !userId) return false;
+      return actor.hasUserLikedPost(postId, userId);
+    },
+    enabled: !!actor && !isFetching && !!userId,
+  });
+}
+
+export function useCreatePost() {
+  const { actor: rawActor } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      authorId: bigint;
+      imageUrl: string;
+      caption: string;
+    }) => {
+      if (!actor) throw new Error("No actor");
+      return actor.createPost(data.authorId, data.imageUrl, data.caption);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+    },
+  });
+}
+
+export function useLikePost() {
+  const { actor: rawActor } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { postId: bigint; userId: bigint }) => {
+      if (!actor) throw new Error("No actor");
+      return actor.likePost(data.postId, data.userId);
+    },
+    onSuccess: (_, { postId, userId }) => {
+      queryClient.invalidateQueries({
+        queryKey: ["postLikeCount", postId.toString()],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["hasLiked", postId.toString(), userId.toString()],
+      });
+    },
+  });
+}
+
+export function useUnlikePost() {
+  const { actor: rawActor } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { postId: bigint; userId: bigint }) => {
+      if (!actor) throw new Error("No actor");
+      return actor.unlikePost(data.postId, data.userId);
+    },
+    onSuccess: (_, { postId, userId }) => {
+      queryClient.invalidateQueries({
+        queryKey: ["postLikeCount", postId.toString()],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["hasLiked", postId.toString(), userId.toString()],
+      });
+    },
+  });
+}
+
+export function useAddPostComment() {
+  const { actor: rawActor } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      postId: bigint;
+      authorId: bigint;
+      authorName: string;
+      text: string;
+    }) => {
+      if (!actor) throw new Error("No actor");
+      return actor.addPostComment(
+        data.postId,
+        data.authorId,
+        data.authorName,
+        data.text,
+      );
+    },
+    onSuccess: (_, { postId }) => {
+      queryClient.invalidateQueries({
+        queryKey: ["postComments", postId.toString()],
+      });
     },
   });
 }

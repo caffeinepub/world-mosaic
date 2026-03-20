@@ -24,6 +24,7 @@ export const UserRole = IDL.Variant({
   'user' : IDL.Null,
   'guest' : IDL.Null,
 });
+export const UserProfile = IDL.Record({ 'name' : IDL.Text });
 export const Profile = IDL.Record({
   'id' : IDL.Nat,
   'bio' : IDL.Text,
@@ -31,8 +32,16 @@ export const Profile = IDL.Record({
   'name' : IDL.Text,
   'createdAt' : IDL.Int,
   'photoUrl' : IDL.Text,
-  'email' : IDL.Text,
+  'email' : IDL.Opt(IDL.Text),
   'socialMedia' : IDL.Opt(IDL.Text),
+});
+export const Review = IDL.Record({
+  'id' : IDL.Nat,
+  'createdAt' : IDL.Int,
+  'authorName' : IDL.Text,
+  'profileId' : IDL.Nat,
+  'comment' : IDL.Text,
+  'rating' : IDL.Nat,
 });
 
 export const idlService = IDL.Service({
@@ -63,23 +72,42 @@ export const idlService = IDL.Service({
     ),
   '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+  'addReview' : IDL.Func([IDL.Nat, IDL.Text, IDL.Nat, IDL.Text], [IDL.Nat], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'createProfile' : IDL.Func(
-      [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Opt(IDL.Text)],
+      [
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+        IDL.Opt(IDL.Text),
+        IDL.Opt(IDL.Text),
+      ],
       [IDL.Nat],
       [],
     ),
   'deleteProfile' : IDL.Func([IDL.Nat], [], []),
+  'getAverageRating' : IDL.Func([IDL.Nat], [IDL.Opt(IDL.Float64)], ['query']),
+  'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getCountries' : IDL.Func(
       [],
       [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
       ['query'],
     ),
+  'getLikeCount' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
   'getProfile' : IDL.Func([IDL.Nat], [Profile], ['query']),
   'getProfiles' : IDL.Func([], [IDL.Vec(Profile)], ['query']),
   'getProfilesByCountry' : IDL.Func([IDL.Text], [IDL.Vec(Profile)], ['query']),
+  'getReviews' : IDL.Func([IDL.Nat], [IDL.Vec(Review)], ['query']),
+  'getUserProfile' : IDL.Func(
+      [IDL.Principal],
+      [IDL.Opt(UserProfile)],
+      ['query'],
+    ),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+  'likeProfile' : IDL.Func([IDL.Nat], [], []),
+  'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'searchProfiles' : IDL.Func([IDL.Text], [IDL.Vec(Profile)], ['query']),
   'updateProfile' : IDL.Func(
       [
@@ -88,7 +116,7 @@ export const idlService = IDL.Service({
         IDL.Text,
         IDL.Text,
         IDL.Text,
-        IDL.Text,
+        IDL.Opt(IDL.Text),
         IDL.Opt(IDL.Text),
       ],
       [],
@@ -115,6 +143,7 @@ export const idlFactory = ({ IDL }) => {
     'user' : IDL.Null,
     'guest' : IDL.Null,
   });
+  const UserProfile = IDL.Record({ 'name' : IDL.Text });
   const Profile = IDL.Record({
     'id' : IDL.Nat,
     'bio' : IDL.Text,
@@ -122,8 +151,16 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Text,
     'createdAt' : IDL.Int,
     'photoUrl' : IDL.Text,
-    'email' : IDL.Text,
+    'email' : IDL.Opt(IDL.Text),
     'socialMedia' : IDL.Opt(IDL.Text),
+  });
+  const Review = IDL.Record({
+    'id' : IDL.Nat,
+    'createdAt' : IDL.Int,
+    'authorName' : IDL.Text,
+    'profileId' : IDL.Nat,
+    'comment' : IDL.Text,
+    'rating' : IDL.Nat,
   });
   
   return IDL.Service({
@@ -154,19 +191,34 @@ export const idlFactory = ({ IDL }) => {
       ),
     '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+    'addReview' : IDL.Func(
+        [IDL.Nat, IDL.Text, IDL.Nat, IDL.Text],
+        [IDL.Nat],
+        [],
+      ),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'createProfile' : IDL.Func(
-        [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Opt(IDL.Text)],
+        [
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          IDL.Opt(IDL.Text),
+          IDL.Opt(IDL.Text),
+        ],
         [IDL.Nat],
         [],
       ),
     'deleteProfile' : IDL.Func([IDL.Nat], [], []),
+    'getAverageRating' : IDL.Func([IDL.Nat], [IDL.Opt(IDL.Float64)], ['query']),
+    'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getCountries' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
         ['query'],
       ),
+    'getLikeCount' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
     'getProfile' : IDL.Func([IDL.Nat], [Profile], ['query']),
     'getProfiles' : IDL.Func([], [IDL.Vec(Profile)], ['query']),
     'getProfilesByCountry' : IDL.Func(
@@ -174,7 +226,15 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(Profile)],
         ['query'],
       ),
+    'getReviews' : IDL.Func([IDL.Nat], [IDL.Vec(Review)], ['query']),
+    'getUserProfile' : IDL.Func(
+        [IDL.Principal],
+        [IDL.Opt(UserProfile)],
+        ['query'],
+      ),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+    'likeProfile' : IDL.Func([IDL.Nat], [], []),
+    'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'searchProfiles' : IDL.Func([IDL.Text], [IDL.Vec(Profile)], ['query']),
     'updateProfile' : IDL.Func(
         [
@@ -183,7 +243,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Text,
           IDL.Text,
           IDL.Text,
-          IDL.Text,
+          IDL.Opt(IDL.Text),
           IDL.Opt(IDL.Text),
         ],
         [],

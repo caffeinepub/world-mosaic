@@ -17,9 +17,18 @@ export interface Profile {
   'name' : string,
   'createdAt' : bigint,
   'photoUrl' : string,
-  'email' : string,
+  'email' : [] | [string],
   'socialMedia' : [] | [string],
 }
+export interface Review {
+  'id' : bigint,
+  'createdAt' : bigint,
+  'authorName' : string,
+  'profileId' : bigint,
+  'comment' : string,
+  'rating' : bigint,
+}
+export interface UserProfile { 'name' : string }
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
@@ -51,21 +60,29 @@ export interface _SERVICE {
   >,
   '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  'addReview' : ActorMethod<[bigint, string, bigint, string], bigint>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'createProfile' : ActorMethod<
-    [string, string, string, string, string, [] | [string]],
+    [string, string, string, string, [] | [string], [] | [string]],
     bigint
   >,
   'deleteProfile' : ActorMethod<[bigint], undefined>,
+  'getAverageRating' : ActorMethod<[bigint], [] | [number]>,
+  'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getCountries' : ActorMethod<[], Array<[string, bigint]>>,
+  'getLikeCount' : ActorMethod<[bigint], bigint>,
   'getProfile' : ActorMethod<[bigint], Profile>,
   'getProfiles' : ActorMethod<[], Array<Profile>>,
   'getProfilesByCountry' : ActorMethod<[string], Array<Profile>>,
+  'getReviews' : ActorMethod<[bigint], Array<Review>>,
+  'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
+  'likeProfile' : ActorMethod<[bigint], undefined>,
+  'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'searchProfiles' : ActorMethod<[string], Array<Profile>>,
   'updateProfile' : ActorMethod<
-    [bigint, string, string, string, string, string, [] | [string]],
+    [bigint, string, string, string, string, [] | [string], [] | [string]],
     undefined
   >,
 }
