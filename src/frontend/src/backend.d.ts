@@ -26,6 +26,7 @@ export interface SocialUser {
     displayName: string;
     createdAt: bigint;
     email: string;
+    isVerified: boolean;
     avatarUrl: string;
     passwordHash: string;
     stageName?: string;
@@ -160,6 +161,7 @@ export interface backendInterface {
     registerUser(username: string, passwordHash: string, displayName: string, email: string, country: string, bio: string, avatarUrl: string): Promise<bigint>;
     rejectFriendRequest(requestId: bigint): Promise<void>;
     removeBadge(badgeId: bigint): Promise<void>;
+    revokeVerification(userId: bigint, adminPassword: string): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     searchProfiles(searchTerm: string): Promise<Array<Profile>>;
     sendFriendRequest(fromId: bigint, toId: bigint): Promise<bigint>;
@@ -167,4 +169,5 @@ export interface backendInterface {
     unlikePost(postId: bigint, userId: bigint): Promise<void>;
     updateProfile(id: bigint, name: string, country: string, photoUrl: string, bio: string, email: string | null, socialMedia: string | null): Promise<void>;
     updateSocialUser(userId: bigint, displayName: string, email: string, country: string, bio: string, avatarUrl: string, userType: string, stageName: string | null, portfolioLink: string | null): Promise<void>;
+    verifyUser(userId: bigint, adminPassword: string): Promise<void>;
 }

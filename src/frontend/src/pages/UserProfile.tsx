@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import type { SocialUser } from "../backend.d";
 import { Variant_pending_rejected_accepted } from "../backend.d";
 import { BadgeDisplay, BadgeList } from "../components/BadgeDisplay";
+import { VerifiedBadge } from "../components/VerifiedBadge";
 import { useAuth } from "../contexts/AuthContext";
 import {
   useAcceptFriendRequest,
@@ -499,8 +500,9 @@ export function UserProfile() {
         </Avatar>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap mb-1">
-            <h1 className="text-xl font-display font-bold text-foreground">
+            <h1 className="text-xl font-display font-bold text-foreground flex items-center gap-1.5">
               {user.displayName}
+              {user.isVerified && <VerifiedBadge size={18} />}
             </h1>
             {user.userType === "actor" && (
               <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-semibold">

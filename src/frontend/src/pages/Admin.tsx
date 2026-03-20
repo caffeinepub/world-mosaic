@@ -30,6 +30,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  BadgeCheck,
   Eye,
   EyeOff,
   Globe,
@@ -37,6 +38,7 @@ import {
   LogOut,
   Pencil,
   Plus,
+  ShieldOff,
   Star,
   Trash2,
   Users,
@@ -50,6 +52,7 @@ import {
   BADGE_TYPES,
   BadgeDisplay,
 } from "../components/BadgeDisplay";
+import { VerifiedBadge } from "../components/VerifiedBadge";
 import {
   useAllSocialUsers,
   useAwardBadge,
@@ -58,8 +61,10 @@ import {
   usePostDailyQuestion,
   useProfiles,
   useRemoveBadge,
+  useRevokeVerification,
   useUpdateProfile,
   useUserBadges,
+  useVerifyUser,
 } from "../hooks/useQueries";
 import { ALL_COUNTRIES, getFlagEmoji, getInitials } from "../utils/flags";
 
@@ -443,6 +448,143 @@ function DailyQuestionTab() {
   );
 }
 
+function VerificationTab() {
+  const { data: socialUsers = [], isLoading } = useAllSocialUsers();
+  const verifyUser = useVerifyUser();
+  const revokeVerification = useRevokeVerification();
+
+  const handleVerify = async (userId: bigint, displayName: string) => {
+    try {
+      await verifyUser.mutateAsync(userId);
+      toast.success(`${displayName} is now verified ✓`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to verify user.";
+      toast.error(msg);
+    }
+  };
+
+  const handleRevoke = async (userId: bigint, displayName: string) => {
+    try {
+      await revokeVerification.mutateAsync(userId);
+      toast.success(`Verification revoked for ${displayName}`);
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to revoke verification.";
+      toast.error(msg);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div
+        data-ocid="admin.verification.loading_state"
+        className="text-center py-20"
+      >
+        <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
+      </div>
+    );
+  }
+
+  if (socialUsers.length === 0) {
+    return (
+      <div
+        data-ocid="admin.verification.empty_state"
+        className="text-center py-20 text-muted-foreground"
+      >
+        <div className="text-5xl mb-4">👥</div>
+        <p className="text-lg font-medium">No users yet</p>
+        <p className="text-sm mt-1">
+          Users will appear here once they register
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-4">
+        <h3 className="font-display font-semibold text-lg flex items-center gap-2">
+          <BadgeCheck className="w-5 h-5 text-blue-500" />
+          Manage Verified Users
+        </h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          Verified users receive a blue tick badge next to their name everywhere
+          on the platform.
+        </p>
+      </div>
+      <div className="space-y-3">
+        {socialUsers.map((user, i) => (
+          <motion.div
+            key={user.id.toString()}
+            data-ocid={`admin.verification.item.${i + 1}`}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.03 }}
+            className="flex items-center gap-4 p-4 bg-card border border-border rounded-2xl shadow-xs"
+          >
+            <div className="w-10 h-10 rounded-full flex-shrink-0 overflow-hidden bg-primary/15 flex items-center justify-center font-bold text-primary text-sm">
+              {user.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={user.displayName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                (user.displayName?.[0]?.toUpperCase() ?? "U")
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="font-display font-semibold text-foreground truncate text-sm">
+                  {user.displayName}
+                </p>
+                {user.isVerified && <VerifiedBadge size={14} />}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                @{user.username} · {user.country}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {user.isVerified ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  data-ocid={`admin.verification.revoke_button.${i + 1}`}
+                  onClick={() => handleRevoke(user.id, user.displayName)}
+                  disabled={revokeVerification.isPending}
+                  className="rounded-xl gap-1.5 border-muted-foreground/30 text-muted-foreground hover:bg-muted"
+                >
+                  {revokeVerification.isPending ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <ShieldOff className="w-3.5 h-3.5" />
+                  )}
+                  Revoke
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  data-ocid={`admin.verification.verify_button.${i + 1}`}
+                  onClick={() => handleVerify(user.id, user.displayName)}
+                  disabled={verifyUser.isPending}
+                  className="rounded-xl gap-1.5 bg-blue-500 hover:bg-blue-600 text-white"
+                >
+                  {verifyUser.isPending ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <BadgeCheck className="w-3.5 h-3.5" />
+                  )}
+                  Verify
+                </Button>
+              )}
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function Admin() {
   const [authenticated, setAuthenticated] = useState(
     () => sessionStorage.getItem(SESSION_KEY) === "true",
@@ -584,6 +726,14 @@ export function Admin() {
             >
               🌐 Daily Question
             </TabsTrigger>
+            <TabsTrigger
+              value="verification"
+              data-ocid="admin.verification.tab"
+              className="rounded-lg gap-2"
+            >
+              <BadgeCheck className="w-4 h-4 text-blue-500" />
+              Verification
+            </TabsTrigger>
           </TabsList>
 
           {/* Profiles Tab */}
@@ -684,6 +834,11 @@ export function Admin() {
           {/* Daily Question Tab */}
           <TabsContent value="daily">
             <DailyQuestionTab />
+          </TabsContent>
+
+          {/* Verification Tab */}
+          <TabsContent value="verification">
+            <VerificationTab />
           </TabsContent>
         </Tabs>
       </section>

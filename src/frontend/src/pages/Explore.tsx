@@ -15,6 +15,7 @@ import { motion } from "motion/react";
 import { useMemo, useState } from "react";
 import type { SocialUser } from "../backend.d";
 import { BadgeList } from "../components/BadgeDisplay";
+import { VerifiedBadge } from "../components/VerifiedBadge";
 import { useAllSocialUsers, useUserBadges } from "../hooks/useQueries";
 import { ALL_COUNTRIES, getFlagEmoji } from "../utils/flags";
 
@@ -38,9 +39,12 @@ function UserCard({ user, index }: { user: SocialUser; index: number }) {
         </Avatar>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-display font-semibold text-foreground text-sm leading-tight">
-              {user.displayName}
-            </p>
+            <div className="flex items-center gap-1">
+              <p className="font-display font-semibold text-foreground text-sm leading-tight">
+                {user.displayName}
+              </p>
+              {user.isVerified && <VerifiedBadge size={14} />}
+            </div>
             {user.userType === "actor" && (
               <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-semibold">
                 🎭 Actor

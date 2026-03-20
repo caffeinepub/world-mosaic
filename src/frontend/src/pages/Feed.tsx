@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import type { Post } from "../backend.d";
 import { CreatePostModal } from "../components/CreatePostModal";
 import { DynamicBackground } from "../components/DynamicBackground";
+import { VerifiedBadge } from "../components/VerifiedBadge";
 import { useAuth } from "../contexts/AuthContext";
 import { sendNotification, useNotifications } from "../hooks/useNotifications";
 import {
@@ -214,13 +215,16 @@ function PostCard({ post }: { post: Post }) {
           </Avatar>
         </Link>
         <div className="flex-1 min-w-0">
-          <Link
-            to="/user/$userId"
-            params={{ userId: post.authorId.toString() }}
-            className="font-semibold text-sm text-foreground hover:text-primary transition-colors"
-          >
-            {author?.displayName ?? author?.username ?? "..."}
-          </Link>
+          <div className="flex items-center gap-1">
+            <Link
+              to="/user/$userId"
+              params={{ userId: post.authorId.toString() }}
+              className="font-semibold text-sm text-foreground hover:text-primary transition-colors"
+            >
+              {author?.displayName ?? author?.username ?? "..."}
+            </Link>
+            {author?.isVerified && <VerifiedBadge size={14} />}
+          </div>
           {author?.country && (
             <p className="text-xs text-muted-foreground">{author.country}</p>
           )}

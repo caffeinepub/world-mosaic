@@ -5,6 +5,7 @@ import { Crown, Medal, Trophy } from "lucide-react";
 import { motion } from "motion/react";
 import type { SocialUser } from "../backend.d";
 import { BadgeList } from "../components/BadgeDisplay";
+import { VerifiedBadge } from "../components/VerifiedBadge";
 import { useLeaderboard, useUserBadges } from "../hooks/useQueries";
 import { getFlagEmoji } from "../utils/flags";
 
@@ -81,6 +82,7 @@ function LeaderboardRow({
           >
             {user.displayName}
           </Link>
+          {user.isVerified && <VerifiedBadge size={14} />}
           {user.userType === "actor" && (
             <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-semibold">
               🎭 Actor

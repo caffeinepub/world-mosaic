@@ -804,3 +804,37 @@ export function useUpdateSocialUser() {
     },
   });
 }
+
+export function useVerifyUser() {
+  const { actor: rawActor } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (userId: bigint) => {
+      if (!actor) throw new Error("No actor");
+      return actor.verifyUser(userId, "worldmossaic9876##");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["allSocialUsers"] });
+      queryClient.invalidateQueries({ queryKey: ["socialUser"] });
+      queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
+    },
+  });
+}
+
+export function useRevokeVerification() {
+  const { actor: rawActor } = useActor();
+  const actor = rawActor as unknown as FullBackend | null;
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (userId: bigint) => {
+      if (!actor) throw new Error("No actor");
+      return actor.revokeVerification(userId, "worldmossaic9876##");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["allSocialUsers"] });
+      queryClient.invalidateQueries({ queryKey: ["socialUser"] });
+      queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
+    },
+  });
+}

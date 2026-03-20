@@ -44,6 +44,7 @@ export const SocialUser = IDL.Record({
   'displayName' : IDL.Text,
   'createdAt' : IDL.Int,
   'email' : IDL.Text,
+  'isVerified' : IDL.Bool,
   'avatarUrl' : IDL.Text,
   'passwordHash' : IDL.Text,
   'stageName' : IDL.Opt(IDL.Text),
@@ -244,6 +245,7 @@ export const idlService = IDL.Service({
     ),
   'rejectFriendRequest' : IDL.Func([IDL.Nat], [], []),
   'removeBadge' : IDL.Func([IDL.Nat], [], []),
+  'revokeVerification' : IDL.Func([IDL.Nat, IDL.Text], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'searchProfiles' : IDL.Func([IDL.Text], [IDL.Vec(Profile)], ['query']),
   'sendFriendRequest' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Nat], []),
@@ -281,6 +283,7 @@ export const idlService = IDL.Service({
       [],
       [],
     ),
+  'verifyUser' : IDL.Func([IDL.Nat, IDL.Text], [], []),
 });
 
 export const idlInitArgs = [];
@@ -322,6 +325,7 @@ export const idlFactory = ({ IDL }) => {
     'displayName' : IDL.Text,
     'createdAt' : IDL.Int,
     'email' : IDL.Text,
+    'isVerified' : IDL.Bool,
     'avatarUrl' : IDL.Text,
     'passwordHash' : IDL.Text,
     'stageName' : IDL.Opt(IDL.Text),
@@ -542,6 +546,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'rejectFriendRequest' : IDL.Func([IDL.Nat], [], []),
     'removeBadge' : IDL.Func([IDL.Nat], [], []),
+    'revokeVerification' : IDL.Func([IDL.Nat, IDL.Text], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'searchProfiles' : IDL.Func([IDL.Text], [IDL.Vec(Profile)], ['query']),
     'sendFriendRequest' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Nat], []),
@@ -579,6 +584,7 @@ export const idlFactory = ({ IDL }) => {
         [],
         [],
       ),
+    'verifyUser' : IDL.Func([IDL.Nat, IDL.Text], [], []),
   });
 };
 

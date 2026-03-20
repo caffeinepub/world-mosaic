@@ -108,6 +108,7 @@ export interface SocialUser {
     displayName: string;
     createdAt: bigint;
     email: string;
+    isVerified: boolean;
     avatarUrl: string;
     passwordHash: string;
     stageName?: string;
@@ -260,6 +261,7 @@ export interface backendInterface {
     registerUser(username: string, passwordHash: string, displayName: string, email: string, country: string, bio: string, avatarUrl: string): Promise<bigint>;
     rejectFriendRequest(requestId: bigint): Promise<void>;
     removeBadge(badgeId: bigint): Promise<void>;
+    revokeVerification(userId: bigint, adminPassword: string): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     searchProfiles(searchTerm: string): Promise<Array<Profile>>;
     sendFriendRequest(fromId: bigint, toId: bigint): Promise<bigint>;
@@ -267,6 +269,7 @@ export interface backendInterface {
     unlikePost(postId: bigint, userId: bigint): Promise<void>;
     updateProfile(id: bigint, name: string, country: string, photoUrl: string, bio: string, email: string | null, socialMedia: string | null): Promise<void>;
     updateSocialUser(userId: bigint, displayName: string, email: string, country: string, bio: string, avatarUrl: string, userType: string, stageName: string | null, portfolioLink: string | null): Promise<void>;
+    verifyUser(userId: bigint, adminPassword: string): Promise<void>;
 }
 import type { DailyQuestion as _DailyQuestion, FriendRequest as _FriendRequest, Notification as _Notification, Profile as _Profile, SocialUser as _SocialUser, UserProfile as _UserProfile, UserRole as _UserRole, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -1083,6 +1086,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async revokeVerification(arg0: bigint, arg1: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.revokeVerification(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.revokeVerification(arg0, arg1);
+            return result;
+        }
+    }
     async saveCallerUserProfile(arg0: UserProfile): Promise<void> {
         if (this.processError) {
             try {
@@ -1181,6 +1198,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async verifyUser(arg0: bigint, arg1: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.verifyUser(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.verifyUser(arg0, arg1);
+            return result;
+        }
+    }
 }
 function from_candid_FriendRequest_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _FriendRequest): FriendRequest {
     return from_candid_record_n24(_uploadFile, _downloadFile, value);
@@ -1232,6 +1263,7 @@ function from_candid_record_n14(_uploadFile: (file: ExternalBlob) => Promise<Uin
     displayName: string;
     createdAt: bigint;
     email: string;
+    isVerified: boolean;
     avatarUrl: string;
     passwordHash: string;
     stageName: [] | [string];
@@ -1246,6 +1278,7 @@ function from_candid_record_n14(_uploadFile: (file: ExternalBlob) => Promise<Uin
     displayName: string;
     createdAt: bigint;
     email: string;
+    isVerified: boolean;
     avatarUrl: string;
     passwordHash: string;
     stageName?: string;
@@ -1261,6 +1294,7 @@ function from_candid_record_n14(_uploadFile: (file: ExternalBlob) => Promise<Uin
         displayName: value.displayName,
         createdAt: value.createdAt,
         email: value.email,
+        isVerified: value.isVerified,
         avatarUrl: value.avatarUrl,
         passwordHash: value.passwordHash,
         stageName: record_opt_to_undefined(from_candid_opt_n15(_uploadFile, _downloadFile, value.stageName))

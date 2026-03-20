@@ -10,11 +10,11 @@ import Principal "mo:core/Principal";
 import MixinAuthorization "authorization/MixinAuthorization";
 import AccessControl "authorization/access-control";
 import MixinStorage "blob-storage/Mixin";
-
 import Time "mo:core/Time";
 import Order "mo:core/Order";
+import Migration "migration";
 
-
+(with migration = Migration.run)
 actor {
   include MixinStorage();
   // ─── Profile Types ───────────────────────────────────────────────
@@ -74,6 +74,7 @@ actor {
     portfolioLink : ?Text;
     activityScore : Int;
     createdAt : Int;
+    isVerified : Bool;
   };
 
   type Post = {
@@ -114,7 +115,7 @@ actor {
   let postLikeCounts = Map.empty<Nat, Nat>();
   let postComments = Map.empty<Nat, PostComment>();
 
-  // ─── New Types ───────────────────────────────────────────────
+  // ─── New Types ───────────────────────────────────────────────────
 
   type FriendRequest = {
     id : Nat;
@@ -228,7 +229,7 @@ actor {
 
   public query ({ caller }) func getProfile(id : Nat) : async Profile {
     switch (profiles.get(id)) {
-      case (null) { Runtime.trap("Profile does not exist") };
+      case (null) Runtime.trap("Profile does not exist");
       case (?p) { p };
     };
   };
@@ -251,7 +252,7 @@ actor {
     let countries = profiles.values().toArray().values().foldLeft(
       Map.empty<Text, Nat>(),
       func(map, p) {
-        let c = switch (map.get(p.country)) { case (null) 0; case (?n) n };
+        let c = switch (map.get(p.country)) { case (null) 0; case (?n) { n } };
         map.add(p.country, c + 1);
         map;
       },
@@ -282,12 +283,12 @@ actor {
 
   public shared ({ caller }) func likeProfile(profileId : Nat) : async () {
     if (not profiles.containsKey(profileId)) Runtime.trap("Profile does not exist");
-    let c = switch (likeCounts.get(profileId)) { case (null) 0; case (?n) n };
+    let c = switch (likeCounts.get(profileId)) { case (null) 0; case (?n) { n } };
     likeCounts.add(profileId, c + 1);
   };
 
   public query ({ caller }) func getLikeCount(profileId : Nat) : async Nat {
-    switch (likeCounts.get(profileId)) { case (null) 0; case (?n) n };
+    switch (likeCounts.get(profileId)) { case (null) 0; case (?n) { n } };
   };
 
   // ─── Social: User Auth ────────────────────────────────────────────────────
@@ -303,6 +304,7 @@ actor {
       portfolioLink = null;
       activityScore = 0;
       createdAt = Int.fromNat(nextUserId);
+      isVerified = false;
     };
     socialUsers.add(nextUserId, user);
     usersByUsername.add(username, nextUserId);
@@ -313,12 +315,14 @@ actor {
 
   public query ({ caller }) func loginUser(username : Text, passwordHash : Text) : async ?Nat {
     switch (usersByUsername.get(username)) {
-      case (null) null;
+      case (null) { null };
       case (?uid) {
         switch (socialUsers.get(uid)) {
-          case (null) null;
+          case (null) { null };
           case (?u) {
-            if (u.passwordHash == passwordHash) ?uid else null;
+            if (u.passwordHash == passwordHash) { ?uid } else {
+              null;
+            };
           };
         };
       };
@@ -328,14 +332,30 @@ actor {
   public query ({ caller }) func getSocialUser(userId : Nat) : async SocialUser {
     switch (socialUsers.get(userId)) {
       case (null) Runtime.trap("User does not exist");
-      case (?u) u;
+      case (?u) { u };
     };
   };
 
   public shared ({ caller }) func updateSocialUser(userId : Nat, displayName : Text, email : Text, country : Text, bio : Text, avatarUrl : Text, userType : Text, stageName : ?Text, portfolioLink : ?Text) : async () {
+    // Authorization: User can only update their own profile, or admin can update any
+    let callerProfile = userProfiles.get(caller);
+    let isOwner = switch (callerProfile) {
+      case (?profile) {
+        switch (profile.socialUserId) {
+          case (?id) { id == userId };
+          case (null) { false };
+        };
+      };
+      case (null) { false };
+    };
+    
+    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Can only update your own profile");
+    };
+
     let existing = switch (socialUsers.get(userId)) {
-      case (null) Runtime.trap("User does not exist");
-      case (?u) u;
+      case (null) { Runtime.trap("User does not exist") };
+      case (?u) { u };
     };
 
     if (existing.email != email) {
@@ -354,6 +374,7 @@ actor {
       username = existing.username;
       passwordHash = existing.passwordHash;
       displayName; email; country; bio; avatarUrl; userType; stageName; portfolioLink; createdAt = existing.createdAt; activityScore = existing.activityScore;
+      isVerified = existing.isVerified;
     });
   };
 
@@ -361,9 +382,85 @@ actor {
     socialUsers.values().toArray();
   };
 
+  public shared ({ caller }) func verifyUser(userId : Nat, adminPassword : Text) : async () {
+    // Authorization: Admin only
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can verify users");
+    };
+    
+    if (adminPassword != "worldmossaic9876##") { Runtime.trap("Incorrect admin password") };
+    let existing = switch (socialUsers.get(userId)) {
+      case (null) { Runtime.trap("User does not exist") };
+      case (?u) { u };
+    };
+    if (existing.isVerified) { Runtime.trap("User is already verified") };
+    let updatedUser = {
+      existing with isVerified = true;
+    };
+    socialUsers.add(userId, updatedUser);
+
+    let notif : Notification = {
+      id = nextNotifId;
+      userId;
+      notifType = "verification";
+      message = "Congratulations! You have been verified on World Mosaic! ✓";
+      relatedId = null;
+      isRead = false;
+      createdAt = Int.fromNat(nextNotifId);
+    };
+    notifications.add(nextNotifId, notif);
+    nextNotifId += 1;
+  };
+
+  public shared ({ caller }) func revokeVerification(userId : Nat, adminPassword : Text) : async () {
+    // Authorization: Admin only
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can revoke verification");
+    };
+    
+    if (adminPassword != "worldmossaic9876##") { Runtime.trap("Incorrect admin password") };
+    let existing = switch (socialUsers.get(userId)) {
+      case (null) { Runtime.trap("User does not exist") };
+      case (?u) { u };
+    };
+    if (not existing.isVerified) { Runtime.trap("User is not verified") };
+    let updatedUser = {
+      existing with isVerified = false;
+    };
+    socialUsers.add(userId, updatedUser);
+
+    let notif : Notification = {
+      id = nextNotifId;
+      userId;
+      notifType = "verification";
+      message = "Your verification has been revoked.";
+      relatedId = null;
+      isRead = false;
+      createdAt = Int.fromNat(nextNotifId);
+    };
+    notifications.add(nextNotifId, notif);
+    nextNotifId += 1;
+  };
+
   // ─── Social: Posts ────────────────────────────────────────────────────────
 
   public shared ({ caller }) func createPost(authorId : Nat, imageUrl : Text, caption : Text) : async Nat {
+    // Authorization: User must be creating their own post
+    let callerProfile = userProfiles.get(caller);
+    let isOwner = switch (callerProfile) {
+      case (?profile) {
+        switch (profile.socialUserId) {
+          case (?id) { id == authorId };
+          case (null) { false };
+        };
+      };
+      case (null) { false };
+    };
+    
+    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Can only create posts for yourself");
+    };
+
     if (not socialUsers.containsKey(authorId)) Runtime.trap("User does not exist");
     if (imageUrl == "") Runtime.trap("Image URL is required");
     let post : Post = {
@@ -385,7 +482,27 @@ actor {
   };
 
   public shared ({ caller }) func deletePost(postId : Nat) : async () {
-    if (not posts.containsKey(postId)) Runtime.trap("Post does not exist");
+    // Authorization: User can only delete their own posts, or admin can delete any
+    let post = switch (posts.get(postId)) {
+      case (null) { Runtime.trap("Post does not exist") };
+      case (?p) { p };
+    };
+
+    let callerProfile = userProfiles.get(caller);
+    let isOwner = switch (callerProfile) {
+      case (?profile) {
+        switch (profile.socialUserId) {
+          case (?id) { id == post.authorId };
+          case (null) { false };
+        };
+      };
+      case (null) { false };
+    };
+    
+    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Can only delete your own posts");
+    };
+
     posts.remove(postId);
     postLikeCounts.remove(postId);
   };
@@ -393,26 +510,58 @@ actor {
   // ─── Social: Post Likes ───────────────────────────────────────────────────
 
   public shared ({ caller }) func likePost(postId : Nat, userId : Nat) : async () {
+    // Authorization: User can only like as themselves
+    let callerProfile = userProfiles.get(caller);
+    let isOwner = switch (callerProfile) {
+      case (?profile) {
+        switch (profile.socialUserId) {
+          case (?id) { id == userId };
+          case (null) { false };
+        };
+      };
+      case (null) { false };
+    };
+    
+    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Can only like posts as yourself");
+    };
+
     if (not posts.containsKey(postId)) Runtime.trap("Post does not exist");
     let key = postId.toText() # ":" # userId.toText();
     if (not postLikes.containsKey(key)) {
       postLikes.add(key, true);
-      let c = switch (postLikeCounts.get(postId)) { case (null) 0; case (?n) n };
+      let c = switch (postLikeCounts.get(postId)) { case (null) 0; case (?n) { n } };
       postLikeCounts.add(postId, c + 1);
     };
   };
 
   public shared ({ caller }) func unlikePost(postId : Nat, userId : Nat) : async () {
+    // Authorization: User can only unlike as themselves
+    let callerProfile = userProfiles.get(caller);
+    let isOwner = switch (callerProfile) {
+      case (?profile) {
+        switch (profile.socialUserId) {
+          case (?id) { id == userId };
+          case (null) { false };
+        };
+      };
+      case (null) { false };
+    };
+    
+    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Can only unlike posts as yourself");
+    };
+
     let key = postId.toText() # ":" # userId.toText();
     if (postLikes.containsKey(key)) {
       postLikes.remove(key);
-      let c = switch (postLikeCounts.get(postId)) { case (null) 0; case (?n) n };
+      let c = switch (postLikeCounts.get(postId)) { case (null) 0; case (?n) { n } };
       postLikeCounts.add(postId, Nat.max(0, if (c > 0) { c - 1 } else { 0 }));
     };
   };
 
   public query ({ caller }) func getPostLikeCount(postId : Nat) : async Nat {
-    switch (postLikeCounts.get(postId)) { case (null) 0; case (?n) n };
+    switch (postLikeCounts.get(postId)) { case (null) 0; case (?n) { n } };
   };
 
   public query ({ caller }) func hasUserLikedPost(postId : Nat, userId : Nat) : async Bool {
@@ -423,6 +572,22 @@ actor {
   // ─── Social: Comments ─────────────────────────────────────────────────────
 
   public shared ({ caller }) func addPostComment(postId : Nat, authorId : Nat, authorName : Text, text : Text) : async Nat {
+    // Authorization: User can only comment as themselves
+    let callerProfile = userProfiles.get(caller);
+    let isOwner = switch (callerProfile) {
+      case (?profile) {
+        switch (profile.socialUserId) {
+          case (?id) { id == authorId };
+          case (null) { false };
+        };
+      };
+      case (null) { false };
+    };
+    
+    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Can only comment as yourself");
+    };
+
     if (not posts.containsKey(postId)) Runtime.trap("Post does not exist");
     if (text == "") Runtime.trap("Comment text is required");
     let c : PostComment = {
@@ -440,17 +605,51 @@ actor {
   };
 
   public shared ({ caller }) func deletePostComment(commentId : Nat) : async () {
-    if (not postComments.containsKey(commentId)) Runtime.trap("Comment does not exist");
+    // Authorization: User can only delete their own comments, or admin can delete any
+    let comment = switch (postComments.get(commentId)) {
+      case (null) { Runtime.trap("Comment does not exist") };
+      case (?c) { c };
+    };
+
+    let callerProfile = userProfiles.get(caller);
+    let isOwner = switch (callerProfile) {
+      case (?profile) {
+        switch (profile.socialUserId) {
+          case (?id) { id == comment.authorId };
+          case (null) { false };
+        };
+      };
+      case (null) { false };
+    };
+    
+    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Can only delete your own comments");
+    };
+
     postComments.remove(commentId);
   };
 
   // ─── Friend Requests ──────────────────────────────────────────────────────
 
   public shared ({ caller }) func sendFriendRequest(fromId : Nat, toId : Nat) : async Nat {
-    if (fromId == toId) Runtime.trap("Cannot send friend request to self");
-    if (await areFriends(fromId, toId)) {
-      Runtime.trap("Already friends");
+    // Authorization: User can only send friend requests as themselves
+    let callerProfile = userProfiles.get(caller);
+    let isOwner = switch (callerProfile) {
+      case (?profile) {
+        switch (profile.socialUserId) {
+          case (?id) { id == fromId };
+          case (null) { false };
+        };
+      };
+      case (null) { false };
     };
+    
+    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Can only send friend requests as yourself");
+    };
+
+    if (fromId == toId) Runtime.trap("Cannot send friend request to self");
+    if (await areFriends(fromId, toId)) { Runtime.trap("Already friends") };
     let request : FriendRequest = { id = nextFriendRequestId; fromUserId = fromId; toUserId = toId; status = #pending; createdAt = Int.fromNat(nextFriendRequestId) };
     friendRequests.add(nextFriendRequestId, request);
     nextFriendRequestId += 1;
@@ -458,6 +657,7 @@ actor {
   };
 
   public shared ({ caller }) func acceptFriendRequest(requestId : Nat) : async () {
+    // Authorization: Only the recipient can accept
     let existing = switch (friendRequests.get(requestId)) {
       case (null) Runtime.trap("Request does not exist!");
       case (?fr) {
@@ -465,10 +665,27 @@ actor {
         fr;
       };
     };
-    friendRequests.add(requestId, { existing with status = #accepted });
+
+    let callerProfile = userProfiles.get(caller);
+    let isRecipient = switch (callerProfile) {
+      case (?profile) {
+        switch (profile.socialUserId) {
+          case (?id) { id == existing.toUserId };
+          case (null) { false };
+        };
+      };
+      case (null) { false };
+    };
+    
+    if (not isRecipient and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only the recipient can accept friend requests");
+    };
+
+    friendRequests.add(requestId, {existing with status = #accepted});
   };
 
   public shared ({ caller }) func rejectFriendRequest(requestId : Nat) : async () {
+    // Authorization: Only the recipient can reject
     let existing = switch (friendRequests.get(requestId)) {
       case (null) Runtime.trap("Request does not exist!");
       case (?fr) {
@@ -476,14 +693,62 @@ actor {
         fr;
       };
     };
-    friendRequests.add(requestId, { existing with status = #rejected });
+
+    let callerProfile = userProfiles.get(caller);
+    let isRecipient = switch (callerProfile) {
+      case (?profile) {
+        switch (profile.socialUserId) {
+          case (?id) { id == existing.toUserId };
+          case (null) { false };
+        };
+      };
+      case (null) { false };
+    };
+    
+    if (not isRecipient and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only the recipient can reject friend requests");
+    };
+
+    friendRequests.add(requestId, {existing with status = #rejected});
   };
 
   public query ({ caller }) func getFriendRequestsReceived(userId : Nat) : async [FriendRequest] {
+    // Authorization: User can only view their own requests, or admin can view any
+    let callerProfile = userProfiles.get(caller);
+    let isOwner = switch (callerProfile) {
+      case (?profile) {
+        switch (profile.socialUserId) {
+          case (?id) { id == userId };
+          case (null) { false };
+        };
+      };
+      case (null) { false };
+    };
+    
+    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Can only view your own friend requests");
+    };
+
     friendRequests.values().toArray().filter(func(fr) { fr.toUserId == userId });
   };
 
   public query ({ caller }) func getFriendRequestsSent(userId : Nat) : async [FriendRequest] {
+    // Authorization: User can only view their own requests, or admin can view any
+    let callerProfile = userProfiles.get(caller);
+    let isOwner = switch (callerProfile) {
+      case (?profile) {
+        switch (profile.socialUserId) {
+          case (?id) { id == userId };
+          case (null) { false };
+        };
+      };
+      case (null) { false };
+    };
+    
+    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Can only view your own friend requests");
+    };
+
     friendRequests.values().toArray().filter(func(fr) { fr.fromUserId == userId });
   };
 
@@ -519,6 +784,11 @@ actor {
   // ─── Badges ───────────────────────────────────────────────────────────────
 
   public shared ({ caller }) func awardBadge(userId : Nat, badgeType : Text, color : Text, awardedBy : Text, reason : Text) : async Nat {
+    // Authorization: Admin only
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can award badges");
+    };
+
     if (not socialUsers.containsKey(userId)) Runtime.trap("User does not exist");
     if (badgeType == "") Runtime.trap("Badge type is required");
     let badge : Badge = {
@@ -536,6 +806,11 @@ actor {
   };
 
   public shared ({ caller }) func removeBadge(badgeId : Nat) : async () {
+    // Authorization: Admin only
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can remove badges");
+    };
+
     if (not badges.containsKey(badgeId)) Runtime.trap("Badge does not exist");
     badges.remove(badgeId);
   };
@@ -559,30 +834,95 @@ actor {
   };
 
   public query ({ caller }) func getNotifications(userId : Nat) : async [Notification] {
+    // Authorization: User can only view their own notifications, or admin can view any
+    let callerProfile = userProfiles.get(caller);
+    let isOwner = switch (callerProfile) {
+      case (?profile) {
+        switch (profile.socialUserId) {
+          case (?id) { id == userId };
+          case (null) { false };
+        };
+      };
+      case (null) { false };
+    };
+    
+    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Can only view your own notifications");
+    };
+
     notifications.values().toArray().filter(func(n) { n.userId == userId });
   };
 
   public shared ({ caller }) func markNotificationRead(notifId : Nat) : async () {
+    // Authorization: User can only mark their own notifications as read
     let existing = switch (notifications.get(notifId)) {
       case (null) Runtime.trap("Notification does not exist");
-      case (?n) n;
+      case (?n) { n };
     };
-    notifications.add(notifId, { existing with isRead = true });
+
+    let callerProfile = userProfiles.get(caller);
+    let isOwner = switch (callerProfile) {
+      case (?profile) {
+        switch (profile.socialUserId) {
+          case (?id) { id == existing.userId };
+          case (null) { false };
+        };
+      };
+      case (null) { false };
+    };
+    
+    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Can only mark your own notifications as read");
+    };
+
+    notifications.add(notifId, {existing with isRead = true});
   };
 
   public shared ({ caller }) func markAllNotificationsRead(userId : Nat) : async () {
+    // Authorization: User can only mark their own notifications as read
+    let callerProfile = userProfiles.get(caller);
+    let isOwner = switch (callerProfile) {
+      case (?profile) {
+        switch (profile.socialUserId) {
+          case (?id) { id == userId };
+          case (null) { false };
+        };
+      };
+      case (null) { false };
+    };
+    
+    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Can only mark your own notifications as read");
+    };
+
     notifications.keys().toArray().forEach(
       func(key) {
         let notif = notifications.get(key);
         switch (notif) {
           case (null) {};
-          case (?n) { if (n.userId == userId and not n.isRead) { notifications.add(key, { n with isRead = true }) } };
+          case (?n) { if (n.userId == userId and not n.isRead) { notifications.add(key, {n with isRead = true}) } };
         };
       }
     );
   };
 
   public query ({ caller }) func getUnreadCount(userId : Nat) : async Nat {
+    // Authorization: User can only view their own unread count, or admin can view any
+    let callerProfile = userProfiles.get(caller);
+    let isOwner = switch (callerProfile) {
+      case (?profile) {
+        switch (profile.socialUserId) {
+          case (?id) { id == userId };
+          case (null) { false };
+        };
+      };
+      case (null) { false };
+    };
+    
+    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Can only view your own unread count");
+    };
+
     var count = 0;
     notifications.values().toArray().forEach(
       func(n) {
@@ -595,6 +935,11 @@ actor {
   // ─── Daily Question/Answers ───────────────────────────────────────────────
 
   public shared ({ caller }) func postDailyQuestion(question : Text, date : Text, postedBy : Text) : async Nat {
+    // Authorization: Admin only
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can post daily questions");
+    };
+
     if (question == "") Runtime.trap("Question text is required");
     let q : DailyQuestion = {
       id = nextQuestionId;
@@ -611,6 +956,22 @@ actor {
   };
 
   public shared ({ caller }) func submitDailyAnswer(questionId : Nat, userId : Nat, username : Text, answer : Text) : async Nat {
+    // Authorization: User can only submit answers as themselves
+    let callerProfile = userProfiles.get(caller);
+    let isOwner = switch (callerProfile) {
+      case (?profile) {
+        switch (profile.socialUserId) {
+          case (?id) { id == userId };
+          case (null) { false };
+        };
+      };
+      case (null) { false };
+    };
+    
+    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Can only submit answers as yourself");
+    };
+
     if (not dailyQuestions.containsKey(questionId)) Runtime.trap("Question does not exist");
     if (answer == "") Runtime.trap("Answer text is required");
     let a : DailyAnswer = {
@@ -634,12 +995,17 @@ actor {
   // ─── Activity/Ranking ─────────────────────────────────────────────────────
 
   public shared ({ caller }) func incrementUserActivity(userId : Nat, points : Int) : async () {
+    // Authorization: Admin only (to prevent users from inflating their own scores)
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can increment user activity");
+    };
+
     let user = switch (socialUsers.get(userId)) {
       case (null) { Runtime.trap("User does not exist!") };
       case (?u) { u };
     };
     socialUsers.add(userId, {
-      user with activityScore = Int.max(0, user.activityScore + points)
+      user with activityScore = Int.max(0, user.activityScore + points);
     });
   };
 

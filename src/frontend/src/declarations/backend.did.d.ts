@@ -96,6 +96,7 @@ export interface SocialUser {
   'displayName' : string,
   'createdAt' : bigint,
   'email' : string,
+  'isVerified' : boolean,
   'avatarUrl' : string,
   'passwordHash' : string,
   'stageName' : [] | [string],
@@ -192,6 +193,7 @@ export interface _SERVICE {
   >,
   'rejectFriendRequest' : ActorMethod<[bigint], undefined>,
   'removeBadge' : ActorMethod<[bigint], undefined>,
+  'revokeVerification' : ActorMethod<[bigint, string], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'searchProfiles' : ActorMethod<[string], Array<Profile>>,
   'sendFriendRequest' : ActorMethod<[bigint, bigint], bigint>,
@@ -215,6 +217,7 @@ export interface _SERVICE {
     ],
     undefined
   >,
+  'verifyUser' : ActorMethod<[bigint, string], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];
