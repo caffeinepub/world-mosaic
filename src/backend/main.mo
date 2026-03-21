@@ -12,15 +12,17 @@ import AccessControl "authorization/access-control";
 import MixinStorage "blob-storage/Mixin";
 import Time "mo:core/Time";
 import Order "mo:core/Order";
-import Migration "migration";
 
-(with migration = Migration.run)
+
+
 actor {
   include MixinStorage();
   // ─── Profile Types ───────────────────────────────────────────────
 
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
+
+  let ADMIN_PASSWORD = "worldmossaic9876##";
 
   type Profile = {
     id : Nat;
@@ -337,22 +339,6 @@ actor {
   };
 
   public shared ({ caller }) func updateSocialUser(userId : Nat, displayName : Text, email : Text, country : Text, bio : Text, avatarUrl : Text, userType : Text, stageName : ?Text, portfolioLink : ?Text) : async () {
-    // Authorization: User can only update their own profile, or admin can update any
-    let callerProfile = userProfiles.get(caller);
-    let isOwner = switch (callerProfile) {
-      case (?profile) {
-        switch (profile.socialUserId) {
-          case (?id) { id == userId };
-          case (null) { false };
-        };
-      };
-      case (null) { false };
-    };
-    
-    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only update your own profile");
-    };
-
     let existing = switch (socialUsers.get(userId)) {
       case (null) { Runtime.trap("User does not exist") };
       case (?u) { u };
@@ -383,12 +369,7 @@ actor {
   };
 
   public shared ({ caller }) func verifyUser(userId : Nat, adminPassword : Text) : async () {
-    // Authorization: Admin only
-    if (not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only admins can verify users");
-    };
-    
-    if (adminPassword != "worldmossaic9876##") { Runtime.trap("Incorrect admin password") };
+    if (adminPassword != ADMIN_PASSWORD) { Runtime.trap("Incorrect admin password") };
     let existing = switch (socialUsers.get(userId)) {
       case (null) { Runtime.trap("User does not exist") };
       case (?u) { u };
@@ -413,12 +394,7 @@ actor {
   };
 
   public shared ({ caller }) func revokeVerification(userId : Nat, adminPassword : Text) : async () {
-    // Authorization: Admin only
-    if (not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only admins can revoke verification");
-    };
-    
-    if (adminPassword != "worldmossaic9876##") { Runtime.trap("Incorrect admin password") };
+    if (adminPassword != ADMIN_PASSWORD) { Runtime.trap("Incorrect admin password") };
     let existing = switch (socialUsers.get(userId)) {
       case (null) { Runtime.trap("User does not exist") };
       case (?u) { u };
@@ -445,22 +421,6 @@ actor {
   // ─── Social: Posts ────────────────────────────────────────────────────────
 
   public shared ({ caller }) func createPost(authorId : Nat, imageUrl : Text, caption : Text) : async Nat {
-    // Authorization: User must be creating their own post
-    let callerProfile = userProfiles.get(caller);
-    let isOwner = switch (callerProfile) {
-      case (?profile) {
-        switch (profile.socialUserId) {
-          case (?id) { id == authorId };
-          case (null) { false };
-        };
-      };
-      case (null) { false };
-    };
-    
-    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only create posts for yourself");
-    };
-
     if (not socialUsers.containsKey(authorId)) Runtime.trap("User does not exist");
     if (imageUrl == "") Runtime.trap("Image URL is required");
     let post : Post = {
@@ -482,27 +442,10 @@ actor {
   };
 
   public shared ({ caller }) func deletePost(postId : Nat) : async () {
-    // Authorization: User can only delete their own posts, or admin can delete any
     let post = switch (posts.get(postId)) {
       case (null) { Runtime.trap("Post does not exist") };
       case (?p) { p };
     };
-
-    let callerProfile = userProfiles.get(caller);
-    let isOwner = switch (callerProfile) {
-      case (?profile) {
-        switch (profile.socialUserId) {
-          case (?id) { id == post.authorId };
-          case (null) { false };
-        };
-      };
-      case (null) { false };
-    };
-    
-    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only delete your own posts");
-    };
-
     posts.remove(postId);
     postLikeCounts.remove(postId);
   };
@@ -510,22 +453,6 @@ actor {
   // ─── Social: Post Likes ───────────────────────────────────────────────────
 
   public shared ({ caller }) func likePost(postId : Nat, userId : Nat) : async () {
-    // Authorization: User can only like as themselves
-    let callerProfile = userProfiles.get(caller);
-    let isOwner = switch (callerProfile) {
-      case (?profile) {
-        switch (profile.socialUserId) {
-          case (?id) { id == userId };
-          case (null) { false };
-        };
-      };
-      case (null) { false };
-    };
-    
-    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only like posts as yourself");
-    };
-
     if (not posts.containsKey(postId)) Runtime.trap("Post does not exist");
     let key = postId.toText() # ":" # userId.toText();
     if (not postLikes.containsKey(key)) {
@@ -536,22 +463,6 @@ actor {
   };
 
   public shared ({ caller }) func unlikePost(postId : Nat, userId : Nat) : async () {
-    // Authorization: User can only unlike as themselves
-    let callerProfile = userProfiles.get(caller);
-    let isOwner = switch (callerProfile) {
-      case (?profile) {
-        switch (profile.socialUserId) {
-          case (?id) { id == userId };
-          case (null) { false };
-        };
-      };
-      case (null) { false };
-    };
-    
-    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only unlike posts as yourself");
-    };
-
     let key = postId.toText() # ":" # userId.toText();
     if (postLikes.containsKey(key)) {
       postLikes.remove(key);
@@ -572,22 +483,6 @@ actor {
   // ─── Social: Comments ─────────────────────────────────────────────────────
 
   public shared ({ caller }) func addPostComment(postId : Nat, authorId : Nat, authorName : Text, text : Text) : async Nat {
-    // Authorization: User can only comment as themselves
-    let callerProfile = userProfiles.get(caller);
-    let isOwner = switch (callerProfile) {
-      case (?profile) {
-        switch (profile.socialUserId) {
-          case (?id) { id == authorId };
-          case (null) { false };
-        };
-      };
-      case (null) { false };
-    };
-    
-    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only comment as yourself");
-    };
-
     if (not posts.containsKey(postId)) Runtime.trap("Post does not exist");
     if (text == "") Runtime.trap("Comment text is required");
     let c : PostComment = {
@@ -605,49 +500,13 @@ actor {
   };
 
   public shared ({ caller }) func deletePostComment(commentId : Nat) : async () {
-    // Authorization: User can only delete their own comments, or admin can delete any
-    let comment = switch (postComments.get(commentId)) {
-      case (null) { Runtime.trap("Comment does not exist") };
-      case (?c) { c };
-    };
-
-    let callerProfile = userProfiles.get(caller);
-    let isOwner = switch (callerProfile) {
-      case (?profile) {
-        switch (profile.socialUserId) {
-          case (?id) { id == comment.authorId };
-          case (null) { false };
-        };
-      };
-      case (null) { false };
-    };
-    
-    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only delete your own comments");
-    };
-
+    if (not postComments.containsKey(commentId)) Runtime.trap("Comment does not exist");
     postComments.remove(commentId);
   };
 
   // ─── Friend Requests ──────────────────────────────────────────────────────
 
   public shared ({ caller }) func sendFriendRequest(fromId : Nat, toId : Nat) : async Nat {
-    // Authorization: User can only send friend requests as themselves
-    let callerProfile = userProfiles.get(caller);
-    let isOwner = switch (callerProfile) {
-      case (?profile) {
-        switch (profile.socialUserId) {
-          case (?id) { id == fromId };
-          case (null) { false };
-        };
-      };
-      case (null) { false };
-    };
-    
-    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only send friend requests as yourself");
-    };
-
     if (fromId == toId) Runtime.trap("Cannot send friend request to self");
     if (await areFriends(fromId, toId)) { Runtime.trap("Already friends") };
     let request : FriendRequest = { id = nextFriendRequestId; fromUserId = fromId; toUserId = toId; status = #pending; createdAt = Int.fromNat(nextFriendRequestId) };
@@ -657,7 +516,6 @@ actor {
   };
 
   public shared ({ caller }) func acceptFriendRequest(requestId : Nat) : async () {
-    // Authorization: Only the recipient can accept
     let existing = switch (friendRequests.get(requestId)) {
       case (null) Runtime.trap("Request does not exist!");
       case (?fr) {
@@ -665,27 +523,10 @@ actor {
         fr;
       };
     };
-
-    let callerProfile = userProfiles.get(caller);
-    let isRecipient = switch (callerProfile) {
-      case (?profile) {
-        switch (profile.socialUserId) {
-          case (?id) { id == existing.toUserId };
-          case (null) { false };
-        };
-      };
-      case (null) { false };
-    };
-    
-    if (not isRecipient and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only the recipient can accept friend requests");
-    };
-
     friendRequests.add(requestId, {existing with status = #accepted});
   };
 
   public shared ({ caller }) func rejectFriendRequest(requestId : Nat) : async () {
-    // Authorization: Only the recipient can reject
     let existing = switch (friendRequests.get(requestId)) {
       case (null) Runtime.trap("Request does not exist!");
       case (?fr) {
@@ -693,62 +534,14 @@ actor {
         fr;
       };
     };
-
-    let callerProfile = userProfiles.get(caller);
-    let isRecipient = switch (callerProfile) {
-      case (?profile) {
-        switch (profile.socialUserId) {
-          case (?id) { id == existing.toUserId };
-          case (null) { false };
-        };
-      };
-      case (null) { false };
-    };
-    
-    if (not isRecipient and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only the recipient can reject friend requests");
-    };
-
     friendRequests.add(requestId, {existing with status = #rejected});
   };
 
   public query ({ caller }) func getFriendRequestsReceived(userId : Nat) : async [FriendRequest] {
-    // Authorization: User can only view their own requests, or admin can view any
-    let callerProfile = userProfiles.get(caller);
-    let isOwner = switch (callerProfile) {
-      case (?profile) {
-        switch (profile.socialUserId) {
-          case (?id) { id == userId };
-          case (null) { false };
-        };
-      };
-      case (null) { false };
-    };
-    
-    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only view your own friend requests");
-    };
-
     friendRequests.values().toArray().filter(func(fr) { fr.toUserId == userId });
   };
 
   public query ({ caller }) func getFriendRequestsSent(userId : Nat) : async [FriendRequest] {
-    // Authorization: User can only view their own requests, or admin can view any
-    let callerProfile = userProfiles.get(caller);
-    let isOwner = switch (callerProfile) {
-      case (?profile) {
-        switch (profile.socialUserId) {
-          case (?id) { id == userId };
-          case (null) { false };
-        };
-      };
-      case (null) { false };
-    };
-    
-    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only view your own friend requests");
-    };
-
     friendRequests.values().toArray().filter(func(fr) { fr.fromUserId == userId });
   };
 
@@ -783,12 +576,8 @@ actor {
 
   // ─── Badges ───────────────────────────────────────────────────────────────
 
-  public shared ({ caller }) func awardBadge(userId : Nat, badgeType : Text, color : Text, awardedBy : Text, reason : Text) : async Nat {
-    // Authorization: Admin only
-    if (not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only admins can award badges");
-    };
-
+  public shared ({ caller }) func awardBadge(userId : Nat, badgeType : Text, color : Text, awardedBy : Text, reason : Text, adminPassword : Text) : async Nat {
+    if (adminPassword != ADMIN_PASSWORD) { Runtime.trap("Incorrect admin password") };
     if (not socialUsers.containsKey(userId)) Runtime.trap("User does not exist");
     if (badgeType == "") Runtime.trap("Badge type is required");
     let badge : Badge = {
@@ -805,12 +594,8 @@ actor {
     badges.values().toArray().filter(func(b) { b.userId == userId });
   };
 
-  public shared ({ caller }) func removeBadge(badgeId : Nat) : async () {
-    // Authorization: Admin only
-    if (not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only admins can remove badges");
-    };
-
+  public shared ({ caller }) func removeBadge(badgeId : Nat, adminPassword : Text) : async () {
+    if (adminPassword != ADMIN_PASSWORD) { Runtime.trap("Incorrect admin password") };
     if (not badges.containsKey(badgeId)) Runtime.trap("Badge does not exist");
     badges.remove(badgeId);
   };
@@ -834,67 +619,18 @@ actor {
   };
 
   public query ({ caller }) func getNotifications(userId : Nat) : async [Notification] {
-    // Authorization: User can only view their own notifications, or admin can view any
-    let callerProfile = userProfiles.get(caller);
-    let isOwner = switch (callerProfile) {
-      case (?profile) {
-        switch (profile.socialUserId) {
-          case (?id) { id == userId };
-          case (null) { false };
-        };
-      };
-      case (null) { false };
-    };
-    
-    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only view your own notifications");
-    };
-
     notifications.values().toArray().filter(func(n) { n.userId == userId });
   };
 
   public shared ({ caller }) func markNotificationRead(notifId : Nat) : async () {
-    // Authorization: User can only mark their own notifications as read
     let existing = switch (notifications.get(notifId)) {
       case (null) Runtime.trap("Notification does not exist");
       case (?n) { n };
     };
-
-    let callerProfile = userProfiles.get(caller);
-    let isOwner = switch (callerProfile) {
-      case (?profile) {
-        switch (profile.socialUserId) {
-          case (?id) { id == existing.userId };
-          case (null) { false };
-        };
-      };
-      case (null) { false };
-    };
-    
-    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only mark your own notifications as read");
-    };
-
     notifications.add(notifId, {existing with isRead = true});
   };
 
   public shared ({ caller }) func markAllNotificationsRead(userId : Nat) : async () {
-    // Authorization: User can only mark their own notifications as read
-    let callerProfile = userProfiles.get(caller);
-    let isOwner = switch (callerProfile) {
-      case (?profile) {
-        switch (profile.socialUserId) {
-          case (?id) { id == userId };
-          case (null) { false };
-        };
-      };
-      case (null) { false };
-    };
-    
-    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only mark your own notifications as read");
-    };
-
     notifications.keys().toArray().forEach(
       func(key) {
         let notif = notifications.get(key);
@@ -907,22 +643,6 @@ actor {
   };
 
   public query ({ caller }) func getUnreadCount(userId : Nat) : async Nat {
-    // Authorization: User can only view their own unread count, or admin can view any
-    let callerProfile = userProfiles.get(caller);
-    let isOwner = switch (callerProfile) {
-      case (?profile) {
-        switch (profile.socialUserId) {
-          case (?id) { id == userId };
-          case (null) { false };
-        };
-      };
-      case (null) { false };
-    };
-    
-    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only view your own unread count");
-    };
-
     var count = 0;
     notifications.values().toArray().forEach(
       func(n) {
@@ -934,12 +654,8 @@ actor {
 
   // ─── Daily Question/Answers ───────────────────────────────────────────────
 
-  public shared ({ caller }) func postDailyQuestion(question : Text, date : Text, postedBy : Text) : async Nat {
-    // Authorization: Admin only
-    if (not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only admins can post daily questions");
-    };
-
+  public shared ({ caller }) func postDailyQuestion(question : Text, date : Text, postedBy : Text, adminPassword : Text) : async Nat {
+    if (adminPassword != ADMIN_PASSWORD) { Runtime.trap("Incorrect admin password") };
     if (question == "") Runtime.trap("Question text is required");
     let q : DailyQuestion = {
       id = nextQuestionId;
@@ -956,22 +672,6 @@ actor {
   };
 
   public shared ({ caller }) func submitDailyAnswer(questionId : Nat, userId : Nat, username : Text, answer : Text) : async Nat {
-    // Authorization: User can only submit answers as themselves
-    let callerProfile = userProfiles.get(caller);
-    let isOwner = switch (callerProfile) {
-      case (?profile) {
-        switch (profile.socialUserId) {
-          case (?id) { id == userId };
-          case (null) { false };
-        };
-      };
-      case (null) { false };
-    };
-    
-    if (not isOwner and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only submit answers as yourself");
-    };
-
     if (not dailyQuestions.containsKey(questionId)) Runtime.trap("Question does not exist");
     if (answer == "") Runtime.trap("Answer text is required");
     let a : DailyAnswer = {
@@ -994,12 +694,8 @@ actor {
 
   // ─── Activity/Ranking ─────────────────────────────────────────────────────
 
-  public shared ({ caller }) func incrementUserActivity(userId : Nat, points : Int) : async () {
-    // Authorization: Admin only (to prevent users from inflating their own scores)
-    if (not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only admins can increment user activity");
-    };
-
+  public shared ({ caller }) func incrementUserActivity(userId : Nat, points : Int, adminPassword : Text) : async () {
+    if (adminPassword != ADMIN_PASSWORD) { Runtime.trap("Incorrect admin password") };
     let user = switch (socialUsers.get(userId)) {
       case (null) { Runtime.trap("User does not exist!") };
       case (?u) { u };

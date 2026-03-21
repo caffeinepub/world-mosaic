@@ -635,6 +635,7 @@ export function useAwardBadge() {
         data.color,
         data.awardedBy,
         data.reason,
+        "worldmossaic9876##",
       );
     },
     onSuccess: () => {
@@ -651,7 +652,7 @@ export function useRemoveBadge() {
   return useMutation({
     mutationFn: async (badgeId: bigint) => {
       if (!actor) throw new Error("No actor");
-      return actor.removeBadge(badgeId);
+      return actor.removeBadge(badgeId, "worldmossaic9876##");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["userBadges"] });
@@ -745,7 +746,12 @@ export function usePostDailyQuestion() {
       postedBy: string;
     }) => {
       if (!actor) throw new Error("No actor");
-      return actor.postDailyQuestion(data.question, data.date, data.postedBy);
+      return actor.postDailyQuestion(
+        data.question,
+        data.date,
+        data.postedBy,
+        "worldmossaic9876##",
+      );
     },
     onSuccess: (_, { date }) => {
       queryClient.invalidateQueries({ queryKey: ["todayQuestion", date] });
@@ -760,7 +766,11 @@ export function useIncrementUserActivity() {
   return useMutation({
     mutationFn: async (data: { userId: bigint; points: bigint }) => {
       if (!actor) throw new Error("No actor");
-      return actor.incrementUserActivity(data.userId, data.points);
+      return actor.incrementUserActivity(
+        data.userId,
+        data.points,
+        "worldmossaic9876##",
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leaderboard"] });

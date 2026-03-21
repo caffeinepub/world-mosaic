@@ -138,7 +138,7 @@ export interface _SERVICE {
   'addReview' : ActorMethod<[bigint, string, bigint, string], bigint>,
   'areFriends' : ActorMethod<[bigint, bigint], boolean>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
-  'awardBadge' : ActorMethod<[bigint, string, string, string, string], bigint>,
+  'awardBadge' : ActorMethod<[bigint, string, string, string, string, string], bigint>,
   'createNotification' : ActorMethod<
     [bigint, string, string, [] | [bigint]],
     bigint
@@ -179,20 +179,20 @@ export interface _SERVICE {
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'hasSocialUserAnswered' : ActorMethod<[bigint, bigint], boolean>,
   'hasUserLikedPost' : ActorMethod<[bigint, bigint], boolean>,
-  'incrementUserActivity' : ActorMethod<[bigint, bigint], undefined>,
+  'incrementUserActivity' : ActorMethod<[bigint, bigint, string], undefined>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'likePost' : ActorMethod<[bigint, bigint], undefined>,
   'likeProfile' : ActorMethod<[bigint], undefined>,
   'loginUser' : ActorMethod<[string, string], [] | [bigint]>,
   'markAllNotificationsRead' : ActorMethod<[bigint], undefined>,
   'markNotificationRead' : ActorMethod<[bigint], undefined>,
-  'postDailyQuestion' : ActorMethod<[string, string, string], bigint>,
+  'postDailyQuestion' : ActorMethod<[string, string, string, string], bigint>,
   'registerUser' : ActorMethod<
     [string, string, string, string, string, string, string],
     bigint
   >,
   'rejectFriendRequest' : ActorMethod<[bigint], undefined>,
-  'removeBadge' : ActorMethod<[bigint], undefined>,
+  'removeBadge' : ActorMethod<[bigint, string], undefined>,
   'revokeVerification' : ActorMethod<[bigint, string], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'searchProfiles' : ActorMethod<[string], Array<Profile>>,

@@ -13,8 +13,7 @@ import { toast } from "sonner";
 import { useCreatePost } from "../hooks/useQueries";
 import { uploadFileToStorage } from "../utils/uploadFile";
 
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
 
 interface CreatePostModalProps {
   open: boolean;
@@ -39,16 +38,16 @@ export function CreatePostModal({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      toast.error("Only JPEG, PNG, and WebP images are allowed.");
+    // Validate file type (canvas will handle HEIC and other formats)
+    if (file.type && !file.type.startsWith("image/")) {
+      toast.error("Only image files are allowed.");
       e.target.value = "";
       return;
     }
 
     // Validate file size
     if (file.size > MAX_SIZE_BYTES) {
-      toast.error("Image must be under 10 MB.");
+      toast.error("Image must be under 25 MB.");
       e.target.value = "";
       return;
     }
@@ -129,7 +128,7 @@ export function CreatePostModal({
                   Click to upload photo
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  JPEG, PNG, WebP · max 10 MB
+                  JPEG, PNG, HEIC · max 25 MB
                 </p>
               </div>
             )}
@@ -154,7 +153,7 @@ export function CreatePostModal({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/*"
             className="hidden"
             onChange={handleImageUpload}
             data-ocid="create_post.upload_button"

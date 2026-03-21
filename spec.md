@@ -1,31 +1,29 @@
 # World Mosaic
 
 ## Current State
-World Mosaic is a full social platform with user auth, posts, feed, badges, friend requests, leaderboard, and explore. SocialUser has no verification field. Admin panel manages badges/posts/profiles.
+World Mosaic is a full-stack social platform with custom username/password authentication (not ICP Internet Identity). The backend uses `AccessControl.isAdmin` which checks ICP principal — but since all callers are anonymous principals, this check always fails, blocking admin-only operations. Image upload accepts JPEG/PNG/WebP only, rejecting HEIC files from iPhones.
 
 ## Requested Changes (Diff)
 
 ### Add
-- `isVerified: Bool` field on `SocialUser`
-- `verifyUser(userId: Nat, adminPass: Text)` backend method
-- `revokeVerification(userId: Nat, adminPass: Text)` backend method
-- Blue tick (✓) displayed next to username everywhere: Feed posts, comments, UserProfile page, Explore grid, Leaderboard, search results
-- Admin panel UI section: list all users with Verify/Revoke buttons
-- Notification created when a user is verified or revoked
+- `adminPassword: Text` parameter to `awardBadge`, `removeBadge`, `postDailyQuestion`, `incrementUserActivity` backend functions
+- HEIC image format support in upload flow (convert to JPEG via canvas before uploading)
+- Client-side image compression/resizing before upload (max 1920px, quality 0.85)
 
 ### Modify
-- `registerUser` and `updateSocialUser` to preserve `isVerified` field
-- `getSocialUser` / `getAllSocialUsers` / `getLeaderboard` return updated type including `isVerified`
-- Admin panel to include verification management tab/section
+- `verifyUser` and `revokeVerification`: remove `AccessControl.isAdmin` check (already validated via adminPassword param)
+- `awardBadge`, `removeBadge`, `postDailyQuestion`, `incrementUserActivity`: replace `AccessControl.isAdmin` with `adminPassword != "worldmossaic9876##"` check
+- Frontend hooks: pass `"worldmossaic9876##"` to newly-password-gated functions
+- `uploadFile.ts`: convert any image to JPEG via canvas before uploading (handles HEIC on iOS)
+- `CreatePostModal.tsx` and `UserProfile.tsx`: change `accept` to `image/*` and allow heic/heif types
+- Backend declarations (`backend.d.ts`, `backend.ts`, `backend.did.js`, `backend.did.d.ts`): update signatures
 
 ### Remove
-- Nothing removed
+- `AccessControl.isAdmin` calls from admin-action functions
 
 ## Implementation Plan
-1. Add `isVerified: Bool` to `SocialUser` type; default false on new registrations
-2. Add `verifyUser` and `revokeVerification` methods (admin-password gated)
-3. Update all user reads to include `isVerified`
-4. Frontend: create `VerifiedBadge` component (blue checkmark icon)
-5. Inject `VerifiedBadge` in Feed posts, comments, UserProfile, Explore, Leaderboard
-6. Add Verification Management section in Admin panel with verify/revoke per user
-7. On verify/revoke, call `createNotification` for the affected user
+1. Update `src/backend/main.mo` — remove isAdmin checks, add adminPassword params
+2. Update all 4 frontend declaration files with new signatures
+3. Update `src/frontend/src/hooks/useQueries.ts` — pass admin password in mutationFn calls
+4. Update `src/frontend/src/utils/uploadFile.ts` — add canvas-based image conversion + compression
+5. Update `CreatePostModal.tsx` and `UserProfile.tsx` — broaden accept, allow heic type

@@ -215,7 +215,7 @@ export interface backendInterface {
     addReview(profileId: bigint, authorName: string, rating: bigint, comment: string): Promise<bigint>;
     areFriends(userId1: bigint, userId2: bigint): Promise<boolean>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
-    awardBadge(userId: bigint, badgeType: string, color: string, awardedBy: string, reason: string): Promise<bigint>;
+    awardBadge(userId: bigint, badgeType: string, color: string, awardedBy: string, reason: string, adminPassword: string): Promise<bigint>;
     createNotification(userId: bigint, notifType: string, message: string, relatedId: bigint | null): Promise<bigint>;
     createPost(authorId: bigint, imageUrl: string, caption: string): Promise<bigint>;
     createProfile(name: string, country: string, photoUrl: string, bio: string, email: string | null, socialMedia: string | null): Promise<bigint>;
@@ -250,17 +250,17 @@ export interface backendInterface {
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     hasSocialUserAnswered(questionId: bigint, userId: bigint): Promise<boolean>;
     hasUserLikedPost(postId: bigint, userId: bigint): Promise<boolean>;
-    incrementUserActivity(userId: bigint, points: bigint): Promise<void>;
+    incrementUserActivity(userId: bigint, points: bigint, adminPassword: string): Promise<void>;
     isCallerAdmin(): Promise<boolean>;
     likePost(postId: bigint, userId: bigint): Promise<void>;
     likeProfile(profileId: bigint): Promise<void>;
     loginUser(username: string, passwordHash: string): Promise<bigint | null>;
     markAllNotificationsRead(userId: bigint): Promise<void>;
     markNotificationRead(notifId: bigint): Promise<void>;
-    postDailyQuestion(question: string, date: string, postedBy: string): Promise<bigint>;
+    postDailyQuestion(question: string, date: string, postedBy: string, adminPassword: string): Promise<bigint>;
     registerUser(username: string, passwordHash: string, displayName: string, email: string, country: string, bio: string, avatarUrl: string): Promise<bigint>;
     rejectFriendRequest(requestId: bigint): Promise<void>;
-    removeBadge(badgeId: bigint): Promise<void>;
+    removeBadge(badgeId: bigint, adminPassword: string): Promise<void>;
     revokeVerification(userId: bigint, adminPassword: string): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     searchProfiles(searchTerm: string): Promise<Array<Profile>>;
@@ -442,17 +442,17 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async awardBadge(arg0: bigint, arg1: string, arg2: string, arg3: string, arg4: string): Promise<bigint> {
+    async awardBadge(arg0: bigint, arg1: string, arg2: string, arg3: string, arg4: string, arg5: string): Promise<bigint> {
         if (this.processError) {
             try {
-                const result = await this.actor.awardBadge(arg0, arg1, arg2, arg3, arg4);
+                const result = await this.actor.awardBadge(arg0, arg1, arg2, arg3, arg4, arg5);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.awardBadge(arg0, arg1, arg2, arg3, arg4);
+            const result = await this.actor.awardBadge(arg0, arg1, arg2, arg3, arg4, arg5);
             return result;
         }
     }
@@ -932,17 +932,17 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async incrementUserActivity(arg0: bigint, arg1: bigint): Promise<void> {
+    async incrementUserActivity(arg0: bigint, arg1: bigint, arg2: string): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.incrementUserActivity(arg0, arg1);
+                const result = await this.actor.incrementUserActivity(arg0, arg1, arg2);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.incrementUserActivity(arg0, arg1);
+            const result = await this.actor.incrementUserActivity(arg0, arg1, arg2);
             return result;
         }
     }
@@ -1030,17 +1030,17 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async postDailyQuestion(arg0: string, arg1: string, arg2: string): Promise<bigint> {
+    async postDailyQuestion(arg0: string, arg1: string, arg2: string, arg3: string): Promise<bigint> {
         if (this.processError) {
             try {
-                const result = await this.actor.postDailyQuestion(arg0, arg1, arg2);
+                const result = await this.actor.postDailyQuestion(arg0, arg1, arg2, arg3);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.postDailyQuestion(arg0, arg1, arg2);
+            const result = await this.actor.postDailyQuestion(arg0, arg1, arg2, arg3);
             return result;
         }
     }
@@ -1072,17 +1072,17 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async removeBadge(arg0: bigint): Promise<void> {
+    async removeBadge(arg0: bigint, arg1: string): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.removeBadge(arg0);
+                const result = await this.actor.removeBadge(arg0, arg1);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.removeBadge(arg0);
+            const result = await this.actor.removeBadge(arg0, arg1);
             return result;
         }
     }
